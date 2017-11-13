@@ -4,11 +4,12 @@
 module Application where
 
 import Control.Lens
-import Data.ByteString  (ByteString)
+import Data.ByteString    (ByteString)
 import GoogleDrive
 import Snap.Core
 import Snap.Http.Server
 import Snap.Snaplet
+import System.Environment
 
 newtype App = App
   { _googleDrive :: Snaplet GoogleDrive }
@@ -28,4 +29,7 @@ routes =
   ]
 
 app :: IO ()
-app = serveSnaplet defaultConfig appInit
+app = do
+  p <- read <$> getEnv "PORT"
+  let conf = setPort p defaultConfig
+  serveSnaplet conf appInit
