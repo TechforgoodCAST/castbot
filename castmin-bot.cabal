@@ -1,0 +1,46 @@
+name:                castmin-bot
+version:             0.1.0.0
+homepage:            https://github.com/TechforgoodCAST/castmin-bot#README
+license:             MIT
+license-file:        LICENSE
+author:              Andrew MacMurray
+maintainer:          a.macmurray@icloud.com
+copyright:           Andrew MacMurray 2017
+category:            Web
+build-type:          Simple
+extra-source-files:  README.md
+cabal-version:       >=1.10
+
+library
+  hs-source-dirs:      src
+  exposed-modules:     Application
+  default-language:    Haskell2010
+  build-depends:       base >= 4.7 && < 5
+                     , bytestring
+                     , monad-control
+                     , mtl
+                     , snap
+                     , snap-core
+                     , snap-server
+                     , lens
+
+executable castmin-bot-exe
+  hs-source-dirs:      app
+  main-is:             Main.hs
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  default-language:    Haskell2010
+  build-depends:       base
+                     , castmin-bot
+
+test-suite castmin-bot-test
+  type:                exitcode-stdio-1.0
+  hs-source-dirs:      test
+  main-is:             Spec.hs
+  ghc-options:         -threaded -rtsopts -with-rtsopts=-N
+  default-language:    Haskell2010
+  build-depends:       base
+                     , castmin-bot
+
+source-repository head
+  type:     git
+  location: https://github.com/TechforgoodCAST/castmin-bot

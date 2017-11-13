@@ -1,2 +1,3 @@
-# castmin-bot
-slack integration to help with CAST admin
+# Castmin Bot
+
+Slack integration to help with general CAST admin
