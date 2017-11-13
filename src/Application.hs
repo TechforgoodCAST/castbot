@@ -6,6 +6,7 @@ module Application where
 import Control.Lens
 import Data.ByteString    (ByteString)
 import GoogleDrive
+import GoogleDrive.Types
 import Snap.Core
 import Snap.Http.Server
 import Snap.Snaplet

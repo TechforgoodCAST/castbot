@@ -17,13 +17,16 @@ library
   other-modules:       GoogleDrive
   default-language:    Haskell2010
   build-depends:       base >= 4.7 && < 5
+                     , aeson
                      , bytestring
+                     , http-conduit
                      , monad-control
                      , mtl
                      , snap
                      , snap-core
                      , snap-server
                      , lens
+                     , text
 
 executable castmin-bot
   hs-source-dirs:      app
