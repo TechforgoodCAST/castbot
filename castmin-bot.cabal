@@ -27,6 +27,7 @@ library
                      , snap-server
                      , lens
                      , text
+                     , transformers
 
 executable castmin-bot
   hs-source-dirs:      app
