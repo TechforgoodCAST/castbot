@@ -3,15 +3,16 @@
 
 module Application where
 
-import Control.Lens       (makeLenses)
-import Data.ByteString    (ByteString)
+import Control.Lens        (makeLenses)
+import Data.ByteString     (ByteString)
 import GoogleDrive
-import GoogleDrive.Types  (GoogleDrive)
+import GoogleDrive.Types   (GoogleDrive)
 import Snap.Core
 import Snap.Http.Server
 import Snap.Snaplet
+import Snap.Util.FileServe
 import System.Environment
-import System.Exit        (exitFailure)
+import System.Exit         (exitFailure)
 
 newtype App = App
   { _googleDrive :: Snaplet GoogleDrive }
@@ -21,7 +22,9 @@ makeLenses ''App
 appInit :: SnapletInit App App
 appInit = makeSnaplet "castmin-bot" "castmin slack bot" Nothing $ do
   g <- nestSnaplet "google-drive" googleDrive gDriveInit
-  addRoutes [("/", infoHandler)]
+  addRoutes [ ("/", serveDirectory "static")
+            , ("/", infoHandler)
+            ]
   return $ App g
 
 infoHandler :: Handler App App ()
