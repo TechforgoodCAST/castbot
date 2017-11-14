@@ -26,16 +26,15 @@ getGDriveConfig :: MonadIO m => m (Maybe Config)
 getGDriveConfig = liftIO . runMaybeT $ do
   cId <- MaybeT $ lookupEnv "CLIENT_ID"
   cSc <- MaybeT $ lookupEnv "CLIENT_SECRET"
-  return $ Config (pack cId) (pack cSc) redirectUri
-  where
-    redirectUri = "http://localhost:8000/google-drive/redirect-auth"
+  rDu <- MaybeT $ lookupEnv "REDIRECT_URI"
+  return $ Config (pack cId) (pack cSc) (pack rDu)
 
 loadGDriveConfig :: MonadIO m => m Config
 loadGDriveConfig =
   getGDriveConfig >>= maybe fail return
   where
     fail   = liftIO $ putStrLn errMsg >> exitFailure
-    errMsg = "please set CLIENT_ID & CLIENT_SECRET env vars"
+    errMsg = "please set CLIENT_ID, CLIENT_SECRET & REDIRECT_URI env vars"
 
 
 -- Snaplet Init
