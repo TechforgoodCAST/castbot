@@ -32,9 +32,9 @@ getGDriveConfig = liftIO . runMaybeT $ do
 
 loadGDriveConfig :: MonadIO m => m Config
 loadGDriveConfig =
-  getGDriveConfig >>= maybe exit return
+  getGDriveConfig >>= maybe fail return
   where
-    exit   = liftIO $ putStrLn errMsg >> exitFailure
+    fail   = liftIO $ putStrLn errMsg >> exitFailure
     errMsg = "please set CLIENT_ID & CLIENT_SECRET env vars"
 
 

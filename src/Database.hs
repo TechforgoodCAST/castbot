@@ -26,10 +26,10 @@ storeRefreshToken :: HasPostgres m => RefreshToken -> m Int64
 storeRefreshToken = execute storeRefreshTokenQuery
 
 pgsConfig :: IO PGSConfig
-pgsConfig = lookupEnv "DATABASE_URL" >>= maybe exit setupConfig
+pgsConfig = lookupEnv "DATABASE_URL" >>= maybe fail setupConfig
   where
+    fail        = putStrLn errMsg >> exitFailure
     setupConfig = return . pgsDefaultConfig . pack
-    exit        = putStrLn errMsg >> exitFailure
     errMsg      = "Please set DATABASE_URL env var"
 
 createTables :: Query

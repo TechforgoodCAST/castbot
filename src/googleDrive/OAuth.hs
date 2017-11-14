@@ -2,10 +2,8 @@
 
 module GoogleDrive.OAuth where
 
-import           Control.Lens                  (view)
 import           Control.Monad.IO.Class        (liftIO)
-import           Control.Monad.State
-import           Data.ByteString
+import           Data.ByteString               (ByteString)
 import           Data.Maybe                    (fromMaybe)
 import           Data.Monoid                   ((<>))
 import qualified Data.Text                     as T
@@ -36,7 +34,7 @@ redirectHandler config = do
     handleStoreRefresh = maybe (return 0) storeRefreshToken
 
 signInHandler :: Config -> Handler b GoogleDrive ()
-signInHandler config = redirect $ signInUrl config
+signInHandler = redirect . signInUrl
 
 
 -- Requests

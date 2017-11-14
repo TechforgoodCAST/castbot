@@ -5,7 +5,7 @@
 
 module GoogleDrive.Types where
 
-import Control.Lens
+import Control.Lens                       (makeLenses)
 import Control.Monad.State                (get)
 import Data.Aeson
 import Data.Text                          (Text)

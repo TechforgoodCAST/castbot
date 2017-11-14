@@ -3,14 +3,15 @@
 
 module Application where
 
-import Control.Lens
+import Control.Lens       (makeLenses)
 import Data.ByteString    (ByteString)
 import GoogleDrive
-import GoogleDrive.Types
+import GoogleDrive.Types  (GoogleDrive)
 import Snap.Core
 import Snap.Http.Server
 import Snap.Snaplet
 import System.Environment
+import System.Exit        (exitFailure)
 
 newtype App = App
   { _googleDrive :: Snaplet GoogleDrive }
@@ -26,8 +27,14 @@ appInit = makeSnaplet "castmin-bot" "castmin slack bot" Nothing $ do
 infoHandler :: Handler App App ()
 infoHandler = writeText "Visit /google-drive/sign-in to link google drive with slack"
 
+loadPort :: IO Int
+loadPort = lookupEnv "PORT" >>= maybe fail (return . read)
+  where
+    fail   = putStrLn errMsg >> exitFailure
+    errMsg = "please set the PORT env var"
+
 app :: IO ()
 app = do
-  p <- read <$> getEnv "PORT"
-  let conf = setPort p defaultConfig
-  serveSnaplet conf appInit
+  p <- loadPort
+  let config = setPort p defaultConfig
+  serveSnaplet config appInit
