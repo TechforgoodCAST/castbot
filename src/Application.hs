@@ -20,14 +20,11 @@ makeLenses ''App
 appInit :: SnapletInit App App
 appInit = makeSnaplet "castmin-bot" "castmin slack bot" Nothing $ do
   g <- nestSnaplet "google-drive" googleDrive gDriveInit
-  addRoutes routes
+  addRoutes [("/", infoHandler)]
   return $ App g
 
-routes :: [(ByteString, Handler App App ())]
-routes =
-  [ ("/", writeText "hello world")
-  , ("/status", writeText "status OK")
-  ]
+infoHandler :: Handler App App ()
+infoHandler = writeText "Visit /google-drive/sign-in to link google drive with slack"
 
 app :: IO ()
 app = do

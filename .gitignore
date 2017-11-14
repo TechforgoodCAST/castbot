@@ -20,4 +20,4 @@ cabal.project.local
 .HTF/
 
 log
-config.env
+.env
