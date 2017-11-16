@@ -24,6 +24,7 @@ library
                      , aeson
                      , attoparsec
                      , bytestring
+                     , datetime
                      , hedis
                      , http-conduit
                      , http-types
