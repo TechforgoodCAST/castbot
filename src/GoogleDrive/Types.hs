@@ -5,15 +5,13 @@
 
 module GoogleDrive.Types where
 
-import Control.Lens                       (makeLenses)
-import Control.Monad.State                (get)
+import Control.Lens         (makeLenses)
+import Control.Monad.State  (get)
 import Data.Aeson
-import Data.Text                          (Text)
-import Data.Word
-import Database.PostgreSQL.Simple.ToField (toField)
-import GHC.Generics                       (Generic)
-import Snap.Snaplet
-import Snap.Snaplet.PostgresqlSimple
+import Data.Text            (Text)
+import GHC.Generics         (Generic)
+import Snap.Snaplet         (Snaplet)
+import Snap.Snaplet.RedisDB (RedisDB)
 
 data Config =
   Config {
@@ -22,12 +20,13 @@ data Config =
   , redirectUri  :: Text
   }
 
-newtype GoogleDrive = GoogleDrive { _db :: Snaplet Postgres }
+data GoogleDrive =
+  GoogleDrive {
+    _db   :: Snaplet RedisDB
+  , _conf :: Config
+  }
 
 makeLenses ''GoogleDrive
-
-instance HasPostgres (Handler b GoogleDrive) where
-  getPostgresState = with db get
 
 newtype AuthCode = AuthCode Text deriving Show
 
@@ -47,9 +46,3 @@ instance FromJSON AuthResponse where
 
 instance FromJSON AccessToken
 instance FromJSON RefreshToken
-
-instance ToRow AccessToken
-instance ToRow RefreshToken
-
-instance FromRow AccessToken
-instance FromRow RefreshToken

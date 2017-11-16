@@ -13,6 +13,7 @@ import Snap.Snaplet
 import Snap.Util.FileServe
 import System.Environment
 import System.Exit         (exitFailure)
+import Util                (printFail)
 
 newtype App = App
   { _googleDrive :: Snaplet GoogleDrive }
@@ -32,9 +33,7 @@ infoHandler = writeText "Visit /google-drive/sign-in to link google drive with s
 
 loadPort :: IO Int
 loadPort = lookupEnv "PORT" >>= maybe fail (return . read)
-  where
-    fail   = putStrLn errMsg >> exitFailure
-    errMsg = "please set the PORT env var"
+  where fail = printFail "please set the PORT env var"
 
 app :: IO ()
 app = do

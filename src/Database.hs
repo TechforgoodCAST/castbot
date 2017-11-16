@@ -1,64 +1,48 @@
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE QuasiQuotes       #-}
 
 module Database where
 
 import Control.Monad.IO.Class
-import Data.ByteString.Char8         (pack)
-import Data.Int                      (Int64)
-import Data.Monoid                   ((<>))
+import Control.Monad.State.Class
+import Data.Attoparsec.ByteString.Char8
+import Data.ByteString.Char8            (pack, unpack)
+import Data.Text.Encoding
+import Database.Redis
 import GoogleDrive.Types
-import Snap.Snaplet.PostgresqlSimple
-import System.Environment            (lookupEnv)
-import System.Exit                   (exitFailure)
-import Text.RawString.QQ
+import Prelude                          hiding (takeWhile)
+import Snap.Snaplet.RedisDB
+import System.Environment               (getEnv)
+import System.Exit                      (exitFailure)
+import Util                             (printFail)
 
-getRefreshToken :: HasPostgres m => m [RefreshToken]
-getRefreshToken = query_ getAccessTokenQuery
-
-getAccessToken :: HasPostgres m => m [AccessToken]
-getAccessToken = query_ getAccessTokenQuery
-
-storeAccessToken :: HasPostgres m => AccessToken -> m Int64
-storeAccessToken = execute storeAccessTokenQuery
-
-storeRefreshToken :: HasPostgres m => RefreshToken -> m Int64
-storeRefreshToken = execute storeRefreshTokenQuery
-
-pgsConfig :: IO PGSConfig
-pgsConfig = lookupEnv "DATABASE_URL" >>= maybe fail setupConfig
+setTokens :: AuthResponse -> Redis (Either Reply Status)
+setTokens (AuthResponse at rt) = do
+  maybe (return noOp) setRefreshToken rt
+  setAccessToken at
   where
-    fail        = putStrLn errMsg >> exitFailure
-    setupConfig = return . pgsDefaultConfig . pack
-    errMsg      = "Please set DATABASE_URL env var"
+    noOp = Right Ok
 
-createTables :: Query
-createTables = [r|
-CREATE TABLE access_token (
-  id SERIAL PRIMARY KEY,
-  token VARCHAR NOT NULL,
-  timestamp timestamp DEFAULT current_timestamp
-);
-CREATE TABLE refresh_token (
-  id SERIAL PRIMARY KEY,
-  token VARCHAR NOT NULL,
-  timestamp timestamp DEFAULT current_timestamp
-);|]
+setRefreshToken :: RefreshToken -> Redis (Either Reply Status)
+setRefreshToken (RefreshToken x) = set "refresh_token" $ encodeUtf8 x
 
-getRefreshTokenQuery :: Query
-getRefreshTokenQuery = "SELECT * FROM refresh_token;"
+setAccessToken :: AccessToken -> Redis (Either Reply Status)
+setAccessToken (AccessToken x)   = set "access_token" $ encodeUtf8 x
 
-getAccessTokenQuery :: Query
-getAccessTokenQuery = "SELECT * FROM access_token;"
+redisConnectInfo :: IO ConnectInfo
+redisConnectInfo = parseCon <$> getEnv "REDIS_URL" >>= either printFail return
+  where parseCon = parseOnly connectionParser . pack
 
-storeAccessTokenQuery :: Query
-storeAccessTokenQuery = "DELETE FROM access_token; " <> insertAccessTokenQuery
-
-storeRefreshTokenQuery :: Query
-storeRefreshTokenQuery = "DELETE FROM refresh_token; " <> insertRefreshTokenQuery
-
-insertAccessTokenQuery :: Query
-insertAccessTokenQuery  = "INSERT INTO access_token (token) VALUES (?);"
-
-insertRefreshTokenQuery :: Query
-insertRefreshTokenQuery = "INSERT INTO refresh_token (token) VALUES (?);"
+connectionParser :: Parser ConnectInfo
+connectionParser = do
+  _    <- string "redis://h:"
+  auth <- takeTill at
+  _    <- char '@'
+  host <- takeTill colon
+  _    <- char ':'
+  port <- decimal
+  return $ defaultConnectInfo { connectHost = unpack host
+                              , connectPort = PortNumber port
+                              , connectAuth = Just auth
+                              }
+  where at    = (==) '@'
+        colon = (==) ':'
