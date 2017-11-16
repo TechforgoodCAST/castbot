@@ -17,16 +17,15 @@ import Util                             (printFail)
 
 setTokens :: AuthResponse -> Redis (Either Reply Status)
 setTokens (AuthResponse at rt) = do
-  maybe (return noOp) setRefreshToken rt
+  maybe noOp setRefreshToken rt
   setAccessToken at
-  where
-    noOp = Right Ok
+  where noOp = return $ Right Ok
 
 setRefreshToken :: RefreshToken -> Redis (Either Reply Status)
-setRefreshToken (RefreshToken x) = set "refresh_token" $ encodeUtf8 x
+setRefreshToken = set "refresh_token" . encodeToken
 
 setAccessToken :: AccessToken -> Redis (Either Reply Status)
-setAccessToken (AccessToken x)   = set "access_token" $ encodeUtf8 x
+setAccessToken = set "access_token" . encodeToken
 
 redisConnectInfo :: IO ConnectInfo
 redisConnectInfo = parseCon <$> getEnv "REDIS_URL" >>= either printFail return

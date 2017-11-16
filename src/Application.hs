@@ -3,17 +3,17 @@
 
 module Application where
 
-import Control.Lens        (makeLenses)
-import Data.ByteString     (ByteString)
+import Control.Lens          (makeLenses)
+import Data.ByteString.Char8 (ByteString)
 import GoogleDrive
-import GoogleDrive.Types   (GoogleDrive)
+import GoogleDrive.Types     (GoogleDrive)
 import Snap.Core
 import Snap.Http.Server
 import Snap.Snaplet
 import Snap.Util.FileServe
 import System.Environment
-import System.Exit         (exitFailure)
-import Util                (printFail)
+import System.Exit           (exitFailure)
+import Util                  (printFail)
 
 newtype App = App
   { _googleDrive :: Snaplet GoogleDrive }

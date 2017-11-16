@@ -5,10 +5,9 @@ module GoogleDrive where
 import Control.Monad.IO.Class    (MonadIO, liftIO)
 import Control.Monad.Trans.Maybe (MaybeT (..), runMaybeT)
 import Data.Aeson
-import Data.ByteString.Lazy      (ByteString)
+import Data.ByteString.Char8     (pack)
 import Data.Foldable             (fold)
 import Data.Monoid               ((<>))
-import Data.Text                 (pack)
 import Database                  (redisConnectInfo)
 import GHC.Generics              (Generic)
 import GoogleDrive.OAuth
