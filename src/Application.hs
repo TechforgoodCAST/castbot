@@ -3,14 +3,16 @@
 
 module Application where
 
+import Control.Concurrent    (forkIO)
 import Control.Lens          (makeLenses)
 import Data.ByteString.Char8 (ByteString)
 import GoogleDrive
+import Poll                  (pollForNewFiles)
 import Snap.Core
 import Snap.Http.Server
 import Snap.Snaplet
-import Snap.Util.FileServe
-import System.Environment
+import Snap.Util.FileServe   (serveDirectory)
+import System.Environment    (lookupEnv)
 import System.Exit           (exitFailure)
 import Util                  (printFail)
 
@@ -38,4 +40,5 @@ app :: IO ()
 app = do
   p <- loadSnapServerPort
   let config = setPort p defaultConfig
+  forkIO pollForNewFiles
   serveSnaplet config appInit
