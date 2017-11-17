@@ -44,6 +44,8 @@ gDriveInit = makeSnaplet "google-drive" "google drive snaplet" Nothing $ do
   addRoutes [ ("/sign-in",        get signInHandler)
             , ("/redirect-auth",  get authRedirectHandler)
             , ("/auth-success",   get authSuccessHandler)
+            , ("/polling/on",     get pollingOnHandler)
+            , ("/polling/off",    get pollingOffHandler)
 
             -- routes that can only be triggered by internal http client
             , ("/check-files",    get $ internalRoute checkNewFilesHandler)
@@ -90,14 +92,22 @@ signInHandler = view conf >>= (redirect . signInUrl)
 
 checkNewFilesHandler :: Handler b GoogleDrive ()
 checkNewFilesHandler = do
-  config <- view conf
-  rfr    <- runRedisDB db getRefreshToken
-  either redisErr (maybeFiles config) rfr
+  config     <- view conf
+  rfr        <- runRedisDB db getRefreshToken
+  shouldPoll <- foldPolling <$> runRedisDB db getPolling
+
+  -- runs request to google drive api and posts to slack if polling is switched on
+  if   shouldPoll
+  then either redisErr (maybeFiles config) rfr
+  else writeBS "polling switched off"
+
   where
     maybeFiles config       = maybe noToken $ handle config
     redisErr                = writeBS . pack . show
     noToken                 = writeBS "Cannot find refresh token, please reauthenticate"
     filesPresent (Files xs) = not $ null xs
+    foldLastChecked now     = either (const now) (fromMaybe now)
+    foldPolling             = either (const False) (fromMaybe False)
 
     handle config rfr = do
       now         <- liftIO getCurrentTime
@@ -110,8 +120,16 @@ checkNewFilesHandler = do
       else
         writeBS "No new files"
 
-foldLastChecked :: DateTime -> Either Reply (Maybe DateTime) -> DateTime
-foldLastChecked now = either (const now) (fromMaybe now)
+
+pollingOnHandler :: Handler b GoogleDrive ()
+pollingOnHandler = do
+  runRedisDB db $ setPolling True
+  writeBS "polling switched on"
+
+pollingOffHandler :: Handler b GoogleDrive ()
+pollingOffHandler = do
+  runRedisDB db $ setPolling False
+  writeBS "polling switched off"
 
 internalRoute :: Handler b GoogleDrive () -> Handler b GoogleDrive ()
 internalRoute handler = do

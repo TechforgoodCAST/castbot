@@ -1,11 +1,20 @@
-module Poll where
+module Poll (pollForNewFiles) where
 
-import Data.ByteString.Lazy
+import Control.Concurrent  (threadDelay)
+import Control.Exception
+import Control.Monad       (forever)
 import GoogleDrive
 import Network.HTTP.Simple
 
-checkFiles :: IO (Response ByteString)
-checkFiles = do
+pollForNewFiles :: IO ()
+pollForNewFiles = poll `catch` printShutdown
+
+printShutdown :: HttpException -> IO ()
+printShutdown _ = putStrLn "Server shutdown: unreachable from internal request"
+
+poll :: IO ()
+poll = forever $ do
+  threadDelay $ 30 * 1000000
   conf <- loadGDriveConfig
   req  <- authorizeInternal conf <$> parseRequest "GET http://localhost:8000/google-drive/check-files"
-  httpLBS req
+  httpLBS req >>= print
