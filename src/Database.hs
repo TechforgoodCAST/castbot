@@ -13,7 +13,6 @@ import Database.Redis
 import GoogleDrive.Types
 import Snap.Snaplet.RedisDB
 import System.Environment               (getEnv)
-import System.Exit                      (exitFailure)
 import Util                             (printFail)
 
 -- key value getters and setters

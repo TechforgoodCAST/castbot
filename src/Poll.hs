@@ -1,9 +1,9 @@
 module Poll (pollForNewFiles) where
 
 import Control.Concurrent  (threadDelay)
-import Control.Exception
+import Control.Exception   (catch)
 import Control.Monad       (forever)
-import GoogleDrive
+import GoogleDrive         (authorizeInternalPoll, loadGDriveConfig)
 import Network.HTTP.Simple
 
 pollForNewFiles :: IO ()

@@ -12,7 +12,6 @@ import qualified Data.ByteString.Lazy      as BL
 import           Data.DateTime
 import           Data.Maybe                (fromMaybe)
 import           Data.Monoid               ((<>))
-import           Data.Text                 (Text)
 import           Data.Text.Encoding        (decodeUtf8)
 import           Database
 import           Database.Redis
@@ -23,7 +22,6 @@ import           Snap.Core                 hiding (Request, Response)
 import           Snap.Snaplet
 import           Snap.Snaplet.RedisDB      (RedisDB, redisDBInit, runRedisDB)
 import           System.Environment        (lookupEnv)
-import           System.Exit               (exitFailure)
 import           Util                      (printFail)
 
 data GoogleDrive =

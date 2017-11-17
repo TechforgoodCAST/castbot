@@ -11,8 +11,8 @@ import Poll                  (pollForNewFiles)
 import Snap.Core
 import Snap.Http.Server
 import Snap.Snaplet
-import Snap.Util.FileServe
-import System.Environment
+import Snap.Util.FileServe   (serveDirectory)
+import System.Environment    (lookupEnv)
 import System.Exit           (exitFailure)
 import Util                  (printFail)
 
