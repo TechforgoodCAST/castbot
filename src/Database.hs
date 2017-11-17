@@ -9,23 +9,19 @@ import Data.ByteString.Char8            (pack, unpack)
 import Data.Text.Encoding
 import Database.Redis
 import GoogleDrive.Types
-import Prelude                          hiding (takeWhile)
 import Snap.Snaplet.RedisDB
 import System.Environment               (getEnv)
 import System.Exit                      (exitFailure)
 import Util                             (printFail)
 
-setTokens :: AuthResponse -> Redis (Either Reply Status)
-setTokens (AuthResponse at rt) = do
-  maybe noOp setRefreshToken rt
-  setAccessToken at
-  where noOp = return $ Right Ok
-
 setRefreshToken :: RefreshToken -> Redis (Either Reply Status)
 setRefreshToken = set "refresh_token" . encodeToken
 
 setAccessToken :: AccessToken -> Redis (Either Reply Status)
-setAccessToken = set "access_token" . encodeToken
+setAccessToken  = set "access_token" . encodeToken
+
+
+-- Connection Utils
 
 redisConnectInfo :: IO ConnectInfo
 redisConnectInfo = parseCon <$> getEnv "REDIS_URL" >>= either printFail return

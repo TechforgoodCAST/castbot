@@ -6,7 +6,6 @@ module Application where
 import Control.Lens          (makeLenses)
 import Data.ByteString.Char8 (ByteString)
 import GoogleDrive
-import GoogleDrive.Types     (GoogleDrive)
 import Snap.Core
 import Snap.Http.Server
 import Snap.Snaplet
@@ -31,12 +30,12 @@ appInit = makeSnaplet "castmin-bot" "castmin slack bot" Nothing $ do
 infoHandler :: Handler App App ()
 infoHandler = writeText "Visit /google-drive/sign-in to link google drive with slack"
 
-loadPort :: IO Int
-loadPort = lookupEnv "PORT" >>= maybe fail (return . read)
+loadSnapServerPort :: IO Int
+loadSnapServerPort = lookupEnv "PORT" >>= maybe fail (return . read)
   where fail = printFail "please set the PORT env var"
 
 app :: IO ()
 app = do
-  p <- loadPort
+  p <- loadSnapServerPort
   let config = setPort p defaultConfig
   serveSnaplet config appInit

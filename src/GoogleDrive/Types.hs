@@ -1,20 +1,12 @@
-{-# LANGUAGE DeriveGeneric     #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
 
 module GoogleDrive.Types where
 
-import Control.Lens          (makeLenses)
-import Control.Monad.State   (get)
 import Data.Aeson
 import Data.ByteString.Char8 (ByteString)
-import Data.DateTime
+import Data.DateTime         (DateTime)
 import Data.Text             (Text)
 import Data.Text.Encoding    (encodeUtf8)
-import GHC.Generics          (Generic)
-import Snap.Snaplet          (Snaplet)
-import Snap.Snaplet.RedisDB  (RedisDB)
 
 data Config =
   Config {
@@ -23,24 +15,9 @@ data Config =
   , redirectUri  :: ByteString
   }
 
-data GoogleDrive =
-  GoogleDrive {
-    _db   :: Snaplet RedisDB
-  , _conf :: Config
-  }
-
-makeLenses ''GoogleDrive
-
-newtype AuthCode = AuthCode Text deriving Show
-
-data AuthResponse =
-  AuthResponse {
-    accessToken  :: AccessToken
-  , refreshToken :: Maybe RefreshToken
-  } deriving (Show)
-
-newtype AccessToken  = AccessToken Text  deriving (Show, Generic)
-newtype RefreshToken = RefreshToken Text deriving (Show, Generic)
+newtype AuthCode     = AuthCode Text deriving Show
+newtype AccessToken  = AccessToken Text  deriving Show
+newtype RefreshToken = RefreshToken Text deriving Show
 
 data File =
   File {
@@ -48,9 +25,12 @@ data File =
   , link          :: Text
   , thumbnailLink :: Maybe Text
   , createdDate   :: DateTime
-  } deriving (Generic, Show)
+  } deriving Show
 
 newtype Files = Files [File] deriving Show
+
+
+-- Token Class (convenience for turning to ByteStrings)
 
 class Token a where
   encodeToken :: a -> ByteString
@@ -64,10 +44,8 @@ instance Token RefreshToken where
 instance Token AuthCode where
   encodeToken (AuthCode x) = encodeUtf8 x
 
-instance FromJSON AuthResponse where
-  parseJSON (Object v) =
-    AuthResponse <$> v .:  "access_token"
-                 <*> v .:? "refresh_token"
+
+-- JSON Instances
 
 instance FromJSON AccessToken where
   parseJSON (Object v) = AccessToken <$> v .: "access_token"
