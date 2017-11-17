@@ -1,55 +1,64 @@
-{-# LANGUAGE DeriveGeneric     #-}
-{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE OverloadedStrings #-}
-{-# LANGUAGE TemplateHaskell   #-}
 
 module GoogleDrive.Types where
 
-import Control.Lens                       (makeLenses)
-import Control.Monad.State                (get)
 import Data.Aeson
-import Data.Text                          (Text)
-import Data.Word
-import Database.PostgreSQL.Simple.ToField (toField)
-import GHC.Generics                       (Generic)
-import Snap.Snaplet
-import Snap.Snaplet.PostgresqlSimple
+import Data.ByteString.Char8 (ByteString)
+import Data.DateTime         (DateTime)
+import Data.Text             (Text)
+import Data.Text.Encoding    (encodeUtf8)
 
 data Config =
   Config {
-    clientId     :: Text
-  , clientSecret :: Text
-  , redirectUri  :: Text
+    clientId     :: ByteString
+  , clientSecret :: ByteString
+  , redirectUri  :: ByteString
   }
 
-newtype GoogleDrive = GoogleDrive { _db :: Snaplet Postgres }
+newtype AuthCode     = AuthCode Text deriving Show
+newtype AccessToken  = AccessToken Text  deriving Show
+newtype RefreshToken = RefreshToken Text deriving Show
 
-makeLenses ''GoogleDrive
+data File =
+  File {
+    title         :: Text
+  , link          :: Text
+  , thumbnailLink :: Maybe Text
+  , createdDate   :: DateTime
+  } deriving Show
 
-instance HasPostgres (Handler b GoogleDrive) where
-  getPostgresState = with db get
+newtype Files = Files [File] deriving Show
 
-newtype AuthCode = AuthCode Text deriving Show
 
-data AuthResponse =
-  AuthResponse {
-    accessToken  :: AccessToken
-  , refreshToken :: Maybe RefreshToken
-  } deriving (Show)
+-- Token Class (convenience for turning to ByteStrings)
 
-newtype AccessToken  = AccessToken Text  deriving (Show, Generic)
-newtype RefreshToken = RefreshToken Text deriving (Show, Generic)
+class Token a where
+  encodeToken :: a -> ByteString
 
-instance FromJSON AuthResponse where
+instance Token AccessToken where
+  encodeToken (AccessToken x) = encodeUtf8 x
+
+instance Token RefreshToken where
+  encodeToken (RefreshToken x) = encodeUtf8 x
+
+instance Token AuthCode where
+  encodeToken (AuthCode x) = encodeUtf8 x
+
+
+-- JSON Instances
+
+instance FromJSON AccessToken where
+  parseJSON (Object v) = AccessToken <$> v .: "access_token"
+
+instance FromJSON RefreshToken where
+  parseJSON (Object v) = RefreshToken <$> v .: "refresh_token"
+
+instance FromJSON Files where
+  parseJSON (Object v) = Files <$> v .: "items"
+
+instance FromJSON File where
   parseJSON (Object v) =
-    AuthResponse <$> v .:  "access_token"
-                 <*> v .:? "refresh_token"
-
-instance FromJSON AccessToken
-instance FromJSON RefreshToken
-
-instance ToRow AccessToken
-instance ToRow RefreshToken
-
-instance FromRow AccessToken
-instance FromRow RefreshToken
+    File <$> v .:  "title"
+         <*> v .:  "alternateLink"
+         <*> v .:? "thumbnailLink"
+         <*> v .:  "createdDate"

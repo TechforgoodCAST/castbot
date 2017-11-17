@@ -40,8 +40,9 @@ packages:
 # Dependency packages to be pulled from upstream that are not in the resolver
 # (e.g., acme-missiles-0.3)
 extra-deps:
+  - datetime-0.3.1
   - snap-1.0.0.2
-  - snaplet-postgresql-simple-1.0.2.0
+  - snaplet-redis-0.1.5
   - heist-1.0.1.0
   - map-syntax-0.2.0.2
   - xmlhtml-0.2.5.1
