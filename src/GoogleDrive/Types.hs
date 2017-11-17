@@ -6,13 +6,15 @@ import Data.Aeson
 import Data.ByteString.Char8 (ByteString)
 import Data.DateTime         (DateTime)
 import Data.Text             (Text)
-import Data.Text.Encoding    (encodeUtf8)
+import Data.Text.Encoding    (decodeUtf8, encodeUtf8)
 
 data Config =
   Config {
-    clientId     :: ByteString
-  , clientSecret :: ByteString
-  , redirectUri  :: ByteString
+    clientId            :: ByteString
+  , clientSecret        :: ByteString
+  , redirectUri         :: ByteString
+  , internalRouteSecret :: ByteString
+  , webhookUrl          :: ByteString
   }
 
 newtype AuthCode     = AuthCode Text deriving Show
@@ -28,21 +30,26 @@ data File =
   } deriving Show
 
 newtype Files = Files [File] deriving Show
+newtype SlackPost = SlackPost Text deriving Show
 
 
--- Token Class (convenience for turning to ByteStrings)
+-- Token Class (convenience for converting between ByteStrings)
 
 class Token a where
   encodeToken :: a -> ByteString
+  decodeToken :: ByteString -> a
 
 instance Token AccessToken where
   encodeToken (AccessToken x) = encodeUtf8 x
+  decodeToken                 = AccessToken . decodeUtf8
 
 instance Token RefreshToken where
   encodeToken (RefreshToken x) = encodeUtf8 x
+  decodeToken                  = RefreshToken . decodeUtf8
 
 instance Token AuthCode where
   encodeToken (AuthCode x) = encodeUtf8 x
+  decodeToken              = AuthCode . decodeUtf8
 
 
 -- JSON Instances
@@ -62,3 +69,12 @@ instance FromJSON File where
          <*> v .:  "alternateLink"
          <*> v .:? "thumbnailLink"
          <*> v .:  "createdDate"
+
+instance ToJSON SlackPost where
+  toJSON (SlackPost x) =
+    object [ "text" .= x
+           , "attachments" .= [ object [ "fallback"  .= ("cat gif" :: Text)
+                                       , "image_url" .= ("https://media.giphy.com/media/PUBxelwT57jsQ/giphy.gif" :: Text)
+                                       ]
+                              ]
+           ]

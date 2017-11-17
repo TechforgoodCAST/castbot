@@ -3,24 +3,28 @@
 
 module GoogleDrive where
 
-import Control.Lens              (makeLenses, view)
-import Control.Monad.IO.Class    (MonadIO, liftIO)
-import Control.Monad.Trans.Maybe (MaybeT (..), runMaybeT)
-import Data.ByteString.Char8     (ByteString, pack, unpack)
-import Data.DateTime             (addMinutes, getCurrentTime)
-import Data.Maybe                (fromMaybe)
-import Data.Monoid               ((<>))
-import Data.Text.Encoding        (decodeUtf8)
-import Database                  (redisConnectInfo, setRefreshToken)
-import GoogleDrive.Types
-import Network.HTTP.Simple
-import Network.HTTP.Types        (hAuthorization, renderQuery)
-import Snap.Core
-import Snap.Snaplet
-import Snap.Snaplet.RedisDB      (RedisDB, redisDBInit, runRedisDB)
-import System.Environment        (lookupEnv)
-import System.Exit               (exitFailure)
-import Util                      (printFail)
+import           Control.Lens              (makeLenses, view)
+import           Control.Monad.IO.Class    (MonadIO, liftIO)
+import           Control.Monad.Trans.Maybe (MaybeT (..), runMaybeT)
+import           Data.ByteString.Char8     (ByteString, pack, unpack)
+import qualified Data.ByteString.Lazy      as BL
+import           Data.DateTime             (addMinutes, getCurrentTime)
+import           Data.Maybe                (fromMaybe)
+import           Data.Monoid               ((<>))
+import           Data.Text                 (Text)
+import           Data.Text.Encoding        (decodeUtf8)
+import           Database                  (getRefreshToken, redisConnectInfo,
+                                            setAccessToken, setRefreshToken)
+import           Database.Redis
+import           GoogleDrive.Types
+import           Network.HTTP.Simple
+import           Network.HTTP.Types        (hAuthorization, renderQuery)
+import           Snap.Core                 hiding (Request, Response)
+import           Snap.Snaplet
+import           Snap.Snaplet.RedisDB      (RedisDB, redisDBInit, runRedisDB)
+import           System.Environment        (lookupEnv)
+import           System.Exit               (exitFailure)
+import           Util                      (printFail)
 
 data GoogleDrive =
   GoogleDrive {
@@ -37,9 +41,12 @@ gDriveInit = makeSnaplet "google-drive" "google drive snaplet" Nothing $ do
   gDriveConfig <- loadGDriveConfig
   connInfo     <- liftIO redisConnectInfo
   redis        <- nestSnaplet "db" db $ redisDBInit connInfo
-  addRoutes [ ("/sign-in",       get signInHandler)
-            , ("/redirect-auth", get redirectHandler)
-            , ("/auth-success",  get authSuccessHandler)
+  addRoutes [ ("/sign-in",        get signInHandler)
+            , ("/redirect-auth",  get authRedirectHandler)
+            , ("/auth-success",   get authSuccessHandler)
+
+            -- routes that can only be triggered by internal http client
+            , ("/check-files",    get $ internalRoute checkNewFilesHandler)
             ]
   return $ GoogleDrive redis gDriveConfig
   where get = method GET
@@ -52,13 +59,15 @@ getGDriveConfig = liftIO . runMaybeT $
   Config <$> mtLookup "CLIENT_ID"
          <*> mtLookup "CLIENT_SECRET"
          <*> mtLookup "REDIRECT_URI"
+         <*> mtLookup "INTERNAL_ROUTE_SECRET"
+         <*> mtLookup "WEBHOOK_URL"
   where mtLookup x = pack <$> (MaybeT $ lookupEnv x)
 
 loadGDriveConfig :: MonadIO m => m Config
 loadGDriveConfig =
   getGDriveConfig >>= maybe fail return
   where fail = liftIO $ printFail msg
-        msg  = "please set CLIENT_ID, CLIENT_SECRET & REDIRECT_URI env vars"
+        msg  = "please set CLIENT_ID, CLIENT_SECRET, REDIRECT_URI & WEBHOOK_URL env vars"
 
 
 -- Handlers
@@ -66,8 +75,8 @@ loadGDriveConfig =
 authSuccessHandler :: Handler b GoogleDrive ()
 authSuccessHandler = writeText "authenication successful"
 
-redirectHandler :: Handler b GoogleDrive ()
-redirectHandler = do
+authRedirectHandler :: Handler b GoogleDrive ()
+authRedirectHandler = do
   config <- view conf
   code   <- decode <$> getParam "code"
   res    <- liftIO . requestAuthCredentials config $ AuthCode code
@@ -76,9 +85,36 @@ redirectHandler = do
   where
     decode = decodeUtf8 . fromMaybe ""
 
-
 signInHandler :: Handler b GoogleDrive ()
 signInHandler = view conf >>= (redirect . signInUrl)
+
+checkNewFilesHandler :: Handler b GoogleDrive ()
+checkNewFilesHandler = do
+  config <- view conf
+  rfr    <- runRedisDB db getRefreshToken
+  either redisErr (maybeFiles config) rfr
+  where
+    maybeFiles config = maybe noToken $ handle config
+    redisErr          = writeBS . pack . show
+    noToken           = writeBS "Cannot find refresh token, please reauthenticate"
+
+    handle config rfr = do
+      (Files xs) <- liftIO $ checkNewFiles config rfr
+      if not $ null xs then do
+        liftIO $ requestPostToSlack config "New files added to proposals!"
+        writeBS "Slack has been notified of new files added"
+      else
+        writeBS "No new files"
+
+internalRoute :: Handler b GoogleDrive () -> Handler b GoogleDrive ()
+internalRoute handler = do
+  secret  <- internalRouteSecret <$> view conf
+  secret' <- headerSecret <$> getRequest
+  if   secret == secret'
+  then handler
+  else writeBS "unauthorized"
+  where
+    headerSecret = fromMaybe "" . getHeader "internal_route_secret" . rqHeaders
 
 
 -- Files
@@ -93,6 +129,12 @@ newFiles (Files xs) = do
 
 
 -- Requests
+
+requestPostToSlack :: Config -> Text -> IO (Response BL.ByteString)
+requestPostToSlack config msg = do
+  req  <- parseRequest $ "POST " <> unpack (webhookUrl config)
+  let req' = setRequestBodyJSON (SlackPost msg) req
+  httpLBS req'
 
 requestFilesInFolder :: Config -> RefreshToken -> IO Files
 requestFilesInFolder config refreshToken = do
@@ -114,6 +156,9 @@ requestAuthCredentials config code = do
   let formBody = authCredentialsFormBody config code
       req      = setRequestBodyURLEncoded formBody baseReq
   getResponseBody <$> httpJSON req
+
+authorizeInternal :: Config -> Request -> Request
+authorizeInternal config = addRequestHeader "internal_route_secret" $ internalRouteSecret config
 
 
 -- URI Helpers
@@ -141,11 +186,11 @@ authCredentialsFormBody config code =
 
 signInUrl :: Config -> ByteString
 signInUrl config = baseUrl <> renderQuery True
-   [ ("client_id",     Just $ clientId config)
-   , ("redirect_uri",  Just $ redirectUri config)
-   , ("scope",         Just scope)
-   , ("access_type",   Just "offline")
-   , ("response_type", Just "code")
+  [ ("client_id",     Just $ clientId config)
+  , ("redirect_uri",  Just $ redirectUri config)
+  , ("scope",         Just scope)
+  , ("access_type",   Just "offline")
+  , ("response_type", Just "code")
   ]
   where
     baseUrl = "https://accounts.google.com/o/oauth2/v2/auth"

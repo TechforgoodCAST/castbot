@@ -3,9 +3,9 @@
 module Database where
 
 import Control.Monad.IO.Class
-import Control.Monad.State.Class
 import Data.Attoparsec.ByteString.Char8
-import Data.ByteString.Char8            (pack, unpack)
+import Data.ByteString.Char8            (ByteString, pack, unpack)
+import Data.Text                        (Text)
 import Data.Text.Encoding
 import Database.Redis
 import GoogleDrive.Types
@@ -13,6 +13,10 @@ import Snap.Snaplet.RedisDB
 import System.Environment               (getEnv)
 import System.Exit                      (exitFailure)
 import Util                             (printFail)
+
+getRefreshToken :: Redis (Either Reply (Maybe RefreshToken))
+getRefreshToken = decodeToken <$$> get "refresh_token"
+  where (<$$>) = fmap . fmap . fmap
 
 setRefreshToken :: RefreshToken -> Redis (Either Reply Status)
 setRefreshToken = set "refresh_token" . encodeToken
