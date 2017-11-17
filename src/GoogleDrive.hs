@@ -1,3 +1,4 @@
+{-# LANGUAGE FlexibleContexts  #-}
 {-# LANGUAGE OverloadedStrings #-}
 {-# LANGUAGE TemplateHaskell   #-}
 
@@ -8,13 +9,12 @@ import           Control.Monad.IO.Class    (MonadIO, liftIO)
 import           Control.Monad.Trans.Maybe (MaybeT (..), runMaybeT)
 import           Data.ByteString.Char8     (ByteString, pack, unpack)
 import qualified Data.ByteString.Lazy      as BL
-import           Data.DateTime             (addMinutes, getCurrentTime)
+import           Data.DateTime
 import           Data.Maybe                (fromMaybe)
 import           Data.Monoid               ((<>))
 import           Data.Text                 (Text)
 import           Data.Text.Encoding        (decodeUtf8)
-import           Database                  (getRefreshToken, redisConnectInfo,
-                                            setAccessToken, setRefreshToken)
+import           Database
 import           Database.Redis
 import           GoogleDrive.Types
 import           Network.HTTP.Simple
@@ -100,12 +100,18 @@ checkNewFilesHandler = do
     filesPresent (Files xs) = not $ null xs
 
     handle config rfr = do
-      fx <- liftIO $ checkNewFiles config rfr
-      if filesPresent fx then do
-        liftIO $ requestPostToSlack config fx
+      now         <- liftIO getCurrentTime
+      lastChecked <- foldLastChecked now <$> runRedisDB db (getLastChecked now)
+      newFiles    <- liftIO $ checkNewFiles config rfr lastChecked
+      if filesPresent newFiles then do
+        liftIO $ requestPostToSlack config newFiles
+        runRedisDB db $ setLastChecked now
         writeBS "Slack has been notified of new files added"
       else
         writeBS "No new files"
+
+foldLastChecked :: DateTime -> Either Reply (Maybe DateTime) -> DateTime
+foldLastChecked now = either (const now) (fromMaybe now)
 
 internalRoute :: Handler b GoogleDrive () -> Handler b GoogleDrive ()
 internalRoute handler = do
@@ -120,13 +126,11 @@ internalRoute handler = do
 
 -- Files
 
-checkNewFiles :: Config -> RefreshToken -> IO Files
-checkNewFiles config rft = requestFilesInFolder config rft >>= newFiles
+checkNewFiles :: Config -> RefreshToken -> DateTime -> IO Files
+checkNewFiles config token lastChecked = newFiles lastChecked <$> requestFilesInFolder config token
 
-newFiles :: Files -> IO Files
-newFiles (Files xs) = do
-  now <- getCurrentTime
-  return . Files $ filter (\x -> addMinutes 1000000 (createdDate x) > now) xs
+newFiles :: DateTime -> Files -> Files
+newFiles lastChecked (Files xs) = Files $ filter (\x -> createdDate x >= lastChecked) xs
 
 
 -- Requests

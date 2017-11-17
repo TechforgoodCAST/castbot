@@ -69,7 +69,7 @@ instance FromJSON File where
 
 instance ToJSON Files where
   toJSON (Files xs) =
-    object [ "text" .= ("Some new files have been added to proposals!" :: Text)
+    object [ "text" .= ("Some new files have been added to the proposals folder!" :: Text)
            , "attachments" .= (map toJSON xs ++ [ catGif ])
            ]
 
