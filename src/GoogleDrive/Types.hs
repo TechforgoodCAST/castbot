@@ -17,20 +17,18 @@ data Config =
   , webhookUrl          :: ByteString
   }
 
-newtype AuthCode     = AuthCode Text deriving Show
-newtype AccessToken  = AccessToken Text  deriving Show
-newtype RefreshToken = RefreshToken Text deriving Show
+newtype AuthCode     = AuthCode Text
+newtype AccessToken  = AccessToken Text
+newtype RefreshToken = RefreshToken Text
 
 data File =
   File {
-    title         :: Text
-  , link          :: Text
-  , thumbnailLink :: Maybe Text
-  , createdDate   :: DateTime
-  } deriving Show
+    title       :: Text
+  , link        :: Text
+  , createdDate :: DateTime
+  }
 
-newtype Files = Files [File] deriving Show
-newtype SlackPost = SlackPost Text deriving Show
+newtype Files = Files [File]
 
 
 -- Token Class (convenience for converting between ByteStrings)
@@ -65,16 +63,27 @@ instance FromJSON Files where
 
 instance FromJSON File where
   parseJSON (Object v) =
-    File <$> v .:  "title"
-         <*> v .:  "alternateLink"
-         <*> v .:? "thumbnailLink"
-         <*> v .:  "createdDate"
+    File <$> v .: "title"
+         <*> v .: "alternateLink"
+         <*> v .: "createdDate"
 
-instance ToJSON SlackPost where
-  toJSON (SlackPost x) =
-    object [ "text" .= x
-           , "attachments" .= [ object [ "fallback"  .= ("cat gif" :: Text)
-                                       , "image_url" .= ("https://media.giphy.com/media/PUBxelwT57jsQ/giphy.gif" :: Text)
-                                       ]
-                              ]
+instance ToJSON Files where
+  toJSON (Files xs) =
+    object [ "text" .= ("Some new files have been added to proposals!" :: Text)
+           , "attachments" .= (map toJSON xs ++ [ catGif ])
            ]
+
+instance ToJSON File where
+  toJSON (File title link _) =
+    object [ "fallback" .= title
+           , "pretext" .= title
+           , "title" .= title
+           , "title_link" .= link
+           , "color" .= ("#03e07b" :: Text)
+           ]
+
+catGif :: Value
+catGif =
+  object [ "fallback"  .= ("cat gif" :: Text)
+         , "image_url" .= ("https://media.giphy.com/media/PUBxelwT57jsQ/giphy.gif" :: Text)
+         ]

@@ -15,8 +15,8 @@ import System.Exit                      (exitFailure)
 import Util                             (printFail)
 
 getRefreshToken :: Redis (Either Reply (Maybe RefreshToken))
-getRefreshToken = decodeToken <$$> get "refresh_token"
-  where (<$$>) = fmap . fmap . fmap
+getRefreshToken = decodeToken `deepMap` get "refresh_token"
+  where deepMap = fmap . fmap . fmap
 
 setRefreshToken :: RefreshToken -> Redis (Either Reply Status)
 setRefreshToken = set "refresh_token" . encodeToken

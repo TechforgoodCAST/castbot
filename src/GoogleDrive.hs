@@ -94,14 +94,15 @@ checkNewFilesHandler = do
   rfr    <- runRedisDB db getRefreshToken
   either redisErr (maybeFiles config) rfr
   where
-    maybeFiles config = maybe noToken $ handle config
-    redisErr          = writeBS . pack . show
-    noToken           = writeBS "Cannot find refresh token, please reauthenticate"
+    maybeFiles config       = maybe noToken $ handle config
+    redisErr                = writeBS . pack . show
+    noToken                 = writeBS "Cannot find refresh token, please reauthenticate"
+    filesPresent (Files xs) = not $ null xs
 
     handle config rfr = do
-      (Files xs) <- liftIO $ checkNewFiles config rfr
-      if not $ null xs then do
-        liftIO $ requestPostToSlack config "New files added to proposals!"
+      fx <- liftIO $ checkNewFiles config rfr
+      if filesPresent fx then do
+        liftIO $ requestPostToSlack config fx
         writeBS "Slack has been notified of new files added"
       else
         writeBS "No new files"
@@ -125,15 +126,15 @@ checkNewFiles config rft = requestFilesInFolder config rft >>= newFiles
 newFiles :: Files -> IO Files
 newFiles (Files xs) = do
   now <- getCurrentTime
-  return . Files $ filter (\x -> addMinutes 1 (createdDate x) > now) xs
+  return . Files $ filter (\x -> addMinutes 1000000 (createdDate x) > now) xs
 
 
 -- Requests
 
-requestPostToSlack :: Config -> Text -> IO (Response BL.ByteString)
-requestPostToSlack config msg = do
+requestPostToSlack :: Config -> Files -> IO (Response BL.ByteString)
+requestPostToSlack config files = do
   req  <- parseRequest $ "POST " <> unpack (webhookUrl config)
-  let req' = setRequestBodyJSON (SlackPost msg) req
+  let req' = setRequestBodyJSON files req
   httpLBS req'
 
 requestFilesInFolder :: Config -> RefreshToken -> IO Files
