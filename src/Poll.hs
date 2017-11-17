@@ -16,5 +16,5 @@ poll :: IO ()
 poll = forever $ do
   threadDelay $ 30 * 1000000
   conf <- loadGDriveConfig
-  req  <- authorizeInternal conf <$> parseRequest "GET http://localhost:8000/google-drive/check-files"
+  req  <- authorizeInternal conf <$> parseRequest "GET https://castmin-bot.herokuapp.com/google-drive/check-files"
   httpLBS req >>= print
