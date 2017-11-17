@@ -10,11 +10,11 @@ import Data.Text.Encoding    (decodeUtf8, encodeUtf8)
 
 data Config =
   Config {
-    clientId            :: ByteString
-  , clientSecret        :: ByteString
-  , redirectUri         :: ByteString
-  , internalRouteSecret :: ByteString
-  , webhookUrl          :: ByteString
+    clientId         :: ByteString
+  , clientSecret     :: ByteString
+  , redirectUri      :: ByteString
+  , pollingSecretKey :: ByteString
+  , webhookUrl       :: ByteString
   }
 
 newtype AuthCode     = AuthCode Text

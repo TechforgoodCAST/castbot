@@ -47,7 +47,7 @@ gDriveInit = makeSnaplet "google-drive" "google drive snaplet" Nothing $ do
             , ("/polling/on",     get pollingOnHandler)
             , ("/polling/off",    get pollingOffHandler)
 
-            -- routes that can only be triggered by internal http client
+            -- polling routes that can only be triggered by internal http client
             , ("/check-files",    get $ internalRoute checkNewFilesHandler)
             ]
   return $ GoogleDrive redis gDriveConfig
@@ -61,7 +61,7 @@ getGDriveConfig = liftIO . runMaybeT $
   Config <$> mtLookup "CLIENT_ID"
          <*> mtLookup "CLIENT_SECRET"
          <*> mtLookup "REDIRECT_URI"
-         <*> mtLookup "INTERNAL_ROUTE_SECRET"
+         <*> mtLookup "POLLING_SECRET_KEY"
          <*> mtLookup "WEBHOOK_URL"
   where mtLookup x = pack <$> (MaybeT $ lookupEnv x)
 
@@ -69,7 +69,12 @@ loadGDriveConfig :: MonadIO m => m Config
 loadGDriveConfig =
   getGDriveConfig >>= maybe fail return
   where fail = liftIO $ printFail msg
-        msg  = "please set CLIENT_ID, CLIENT_SECRET, REDIRECT_URI & WEBHOOK_URL env vars"
+        msg  = mconcat [ "please set CLIENT_ID, "
+                       , "CLIENT_SECRET, "
+                       , "REDIRECT_URI, "
+                       , "POLLING_SECRET_KEY, "
+                       , "& WEBHOOK_URL env vars"
+                       ]
 
 
 -- Handlers
@@ -92,17 +97,17 @@ signInHandler = view conf >>= (redirect . signInUrl)
 
 checkNewFilesHandler :: Handler b GoogleDrive ()
 checkNewFilesHandler = do
-  config     <- view conf
-  rfr        <- runRedisDB db getRefreshToken
-  shouldPoll <- foldPolling <$> runRedisDB db getPolling
+  config       <- view conf
+  refreshToken <- runRedisDB db getRefreshToken
+  shouldPoll   <- foldPolling <$> runRedisDB db getPolling
 
   -- runs request to google drive api and posts to slack if polling is switched on
   if   shouldPoll
-  then either redisErr (maybeFiles config) rfr
+  then either redisErr (maybeCheckFiles config) refreshToken
   else writeBS "polling switched off"
 
   where
-    maybeFiles config       = maybe noToken $ handle config
+    maybeCheckFiles config  = maybe noToken $ handle config
     redisErr                = writeBS . pack . show
     noToken                 = writeBS "Cannot find refresh token, please reauthenticate"
     filesPresent (Files xs) = not $ null xs
@@ -133,13 +138,15 @@ pollingOffHandler = do
 
 internalRoute :: Handler b GoogleDrive () -> Handler b GoogleDrive ()
 internalRoute handler = do
-  secret  <- internalRouteSecret <$> view conf
+  secret  <- pollingSecretKey <$> view conf
   secret' <- headerSecret <$> getRequest
   if   secret == secret'
   then handler
-  else writeBS "unauthorized"
+  else do
+    modifyResponse $ setResponseStatus 401 "unauthorized"
+    writeBS "unauthorized"
   where
-    headerSecret = fromMaybe "" . getHeader "internal_route_secret" . rqHeaders
+    headerSecret = fromMaybe "" . getHeader "polling_secret_key" . rqHeaders
 
 
 -- Files
@@ -180,8 +187,8 @@ requestAuthCredentials config code = do
       req      = setRequestBodyURLEncoded formBody baseReq
   getResponseBody <$> httpJSON req
 
-authorizeInternal :: Config -> Request -> Request
-authorizeInternal config = addRequestHeader "internal_route_secret" $ internalRouteSecret config
+authorizeInternalPoll :: Config -> Request -> Request
+authorizeInternalPoll config = addRequestHeader "polling_secret_key" $ pollingSecretKey config
 
 
 -- URI Helpers
