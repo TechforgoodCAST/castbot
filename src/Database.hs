@@ -13,7 +13,6 @@ import Database.Redis
 import GoogleDrive.Types
 import Snap.Snaplet.RedisDB
 import System.Environment               (getEnv)
-import Util                             (printFail)
 
 -- key value getters and setters
 
@@ -40,11 +39,10 @@ deepMap :: (Functor f, Functor f1, Functor f2) => (a -> b) -> f2 (f1 (f a)) -> f
 deepMap = fmap . fmap . fmap
 
 
--- Connection Utils
+-- Parse Connection
 
-redisConnectInfo :: IO ConnectInfo
-redisConnectInfo = parseCon <$> getEnv "REDIS_URL" >>= either printFail return
-  where parseCon = parseOnly connectionParser . pack
+parseConnection :: String -> Either String ConnectInfo
+parseConnection = parseOnly connectionParser . pack
 
 connectionParser :: Parser ConnectInfo
 connectionParser = do
