@@ -1,9 +1,10 @@
-module Poll (pollForNewFiles) where
+module Client (pollForNewFiles) where
 
 import Control.Concurrent  (threadDelay)
 import Control.Exception   (catch)
 import Control.Monad       (forever)
-import GoogleDrive         (authorizeInternalPoll, loadGDriveConfig)
+import Environment         (loadGDriveConfig)
+import GoogleDrive         (authorizeInternalPoll)
 import Network.HTTP.Simple
 
 pollForNewFiles :: IO ()
@@ -14,8 +15,8 @@ printShutdown _ = putStrLn "Server shutdown: unreachable from internal request"
 
 poll :: IO ()
 poll = forever $ do
-  threadDelay $ 30 * 1000000
-  let r = "GET https://castmin-bot.herokuapp.com/google-drive/check-files"
+  threadDelay $ 10 * 1000000
+  let r = "GET http://localhost:8000/google-drive/check-files"
   conf <- loadGDriveConfig
   req  <- authorizeInternalPoll conf <$> parseRequest r
   httpLBS req >>= print
