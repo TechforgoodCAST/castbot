@@ -41,14 +41,14 @@ To develop webooks locally (i.e. incoming messages from slack to the server), I'
 
 These env vars (in a `.env` file) are required for the project to work:
 ```DotEnv
-PORT=<server port>
-SLACK_WEBHOOK_URL=<webhook url to post new messages to slack>
-GDRIVE_CLIENT_ID=<client id for google drive>
-GDRIVE_CLIENT_SECRET=<client secret for google drive>
-POLLING_SECRET_KEY=<random string for internal http client>
-REDIRECT_URI=<redirect uri for google drive authentication>
-REDIS_URL=<url to redis database>
-SLACK_VERIFICATION_TOKEN=<token sent from slack slash commands>
+PORT="<server port>"
+SLACK_WEBHOOK_URL="<webhook url to post new messages to slack>"
+GDRIVE_CLIENT_ID="<client id for google drive>"
+GDRIVE_CLIENT_SECRET="<client secret for google drive>"
+POLLING_SECRET_KEY="<random string for internal http client>"
+REDIRECT_URI="<redirect uri for google drive authentication>"
+REDIS_URL="<url to redis database>"
+SLACK_VERIFICATION_TOKEN="<token sent from slack slash commands>"
 ```
 
 ## Start the application
