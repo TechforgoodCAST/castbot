@@ -10,24 +10,25 @@ import           Control.Monad.Trans.Maybe (MaybeT (..), runMaybeT)
 import           Data.ByteString.Char8     (ByteString, pack, unpack)
 import qualified Data.ByteString.Lazy      as BL
 import           Data.DateTime
+import qualified Data.Map                  as M
 import           Data.Maybe                (fromMaybe)
 import           Data.Monoid               ((<>))
 import           Data.Text.Encoding        (decodeUtf8)
 import           Database
 import           Database.Redis
+import           Environment
 import           GoogleDrive.Types
 import           Network.HTTP.Simple
 import           Network.HTTP.Types        (hAuthorization, renderQuery)
 import           Snap.Core                 hiding (Request, Response)
 import           Snap.Snaplet
 import           Snap.Snaplet.RedisDB      (RedisDB, redisDBInit, runRedisDB)
-import           System.Environment        (lookupEnv)
-import           Util                      (printFail)
+import           Util                      (safeHead)
 
 data GoogleDrive =
   GoogleDrive {
     _db   :: Snaplet RedisDB
-  , _conf :: Config
+  , _conf :: GDriveConfig
   }
 
 makeLenses ''GoogleDrive
@@ -37,43 +38,19 @@ makeLenses ''GoogleDrive
 gDriveInit :: SnapletInit b GoogleDrive
 gDriveInit = makeSnaplet "google-drive" "google drive snaplet" Nothing $ do
   gDriveConfig <- loadGDriveConfig
-  connInfo     <- liftIO redisConnectInfo
+  connInfo     <- liftIO loadRedisConnectInfo
   redis        <- nestSnaplet "db" db $ redisDBInit connInfo
   addRoutes [ ("/sign-in",        get signInHandler)
             , ("/redirect-auth",  get authRedirectHandler)
             , ("/auth-success",   get authSuccessHandler)
-            , ("/polling/on",     get pollingOnHandler)
-            , ("/polling/off",    get pollingOffHandler)
+            , ("/notifications",  post notifications)
 
-            -- polling routes that can only be triggered by internal http client
+            -- routes that can only be triggered by internal http client
             , ("/check-files",    get $ internalRoute checkNewFilesHandler)
             ]
   return $ GoogleDrive redis gDriveConfig
-  where get = method GET
-
-
--- Config
-
-getGDriveConfig :: MonadIO m => m (Maybe Config)
-getGDriveConfig = liftIO . runMaybeT $
-  Config <$> mtLookup "CLIENT_ID"
-         <*> mtLookup "CLIENT_SECRET"
-         <*> mtLookup "REDIRECT_URI"
-         <*> mtLookup "POLLING_SECRET_KEY"
-         <*> mtLookup "WEBHOOK_URL"
-  where mtLookup x = pack <$> (MaybeT $ lookupEnv x)
-
-loadGDriveConfig :: MonadIO m => m Config
-loadGDriveConfig =
-  getGDriveConfig >>= maybe fail return
-  where fail = liftIO $ printFail msg
-        msg  = mconcat [ "please set CLIENT_ID, "
-                       , "CLIENT_SECRET, "
-                       , "REDIRECT_URI, "
-                       , "POLLING_SECRET_KEY, "
-                       , "& WEBHOOK_URL env vars"
-                       ]
-
+  where get  = method GET
+        post = method POST
 
 -- Handlers
 
@@ -123,16 +100,41 @@ checkNewFilesHandler = do
       else
         writeBS "No new files"
 
+notifications :: Handler b GoogleDrive ()
+notifications = do
+  config <- view conf
+  p      <- rqPostParams <$> getRequest
+  if isFromSlack config p then
+    handleSlackPayload $ slackPayload p
+  else do
+    modifyResponse $ setResponseStatus 401 "unauthorized"
+    writeBS "unauthorized"
 
-pollingOnHandler :: Handler b GoogleDrive ()
-pollingOnHandler = do
+isFromSlack :: GDriveConfig -> Params -> Bool
+isFromSlack config p = fromMaybe False $ do
+  x <- M.lookup "token" p
+  y <- safeHead x
+  return $ y == slackToken config
+
+slackPayload :: Params -> Maybe ByteString
+slackPayload p = M.lookup "text" p >>= safeHead
+
+handleSlackPayload :: Maybe ByteString -> Handler b GoogleDrive ()
+handleSlackPayload payload =
+  case payload of
+    Just "on"  -> notificationsOnHandler
+    Just "off" -> notificationsOffHandler
+    _          -> writeBS "Sorry I didn't quite get that, please enter either 'on' or 'off'"
+
+notificationsOnHandler :: Handler b GoogleDrive ()
+notificationsOnHandler = do
   runRedisDB db $ setPolling True
-  writeBS "polling switched on"
+  writeBS "notifications switched on"
 
-pollingOffHandler :: Handler b GoogleDrive ()
-pollingOffHandler = do
+notificationsOffHandler :: Handler b GoogleDrive ()
+notificationsOffHandler = do
   runRedisDB db $ setPolling False
-  writeBS "polling switched off"
+  writeBS "notifications switched off"
 
 internalRoute :: Handler b GoogleDrive () -> Handler b GoogleDrive ()
 internalRoute handler = do
@@ -149,43 +151,43 @@ internalRoute handler = do
 
 -- Files
 
-checkNewFiles :: Config -> RefreshToken -> DateTime -> IO Files
+checkNewFiles :: GDriveConfig -> RefreshToken -> DateTime -> IO Files
 checkNewFiles config token lastChecked = newFiles lastChecked <$> requestFilesInFolder config token
 
 newFiles :: DateTime -> Files -> Files
 newFiles lastChecked (Files xs) = Files $ filter (\x -> createdDate x >= lastChecked) xs
 
 
--- Requests
+-- HTTP Client Requests
 
-requestPostToSlack :: Config -> Files -> IO (Response BL.ByteString)
+requestPostToSlack :: GDriveConfig -> Files -> IO (Response BL.ByteString)
 requestPostToSlack config files = do
   req  <- parseRequest $ "POST " <> unpack (webhookUrl config)
   let req' = setRequestBodyJSON files req
   httpLBS req'
 
-requestFilesInFolder :: Config -> RefreshToken -> IO Files
+requestFilesInFolder :: GDriveConfig -> RefreshToken -> IO Files
 requestFilesInFolder config refreshToken = do
   tkn     <- encodeToken <$> requestAccessToken config refreshToken
   baseReq <- parseRequest $ "GET https://www.googleapis.com/drive/v2/files" <> unpack filesQuery
   let req = addRequestHeader hAuthorization ("Bearer " <> tkn) baseReq
   getResponseBody <$> httpJSON req
 
-requestAccessToken :: Config -> RefreshToken -> IO AccessToken
+requestAccessToken :: GDriveConfig -> RefreshToken -> IO AccessToken
 requestAccessToken config refreshToken = do
   baseReq <- parseRequest "POST https://www.googleapis.com/oauth2/v4/token"
   let formBody = accessTokenFormBody config refreshToken
       req      = setRequestBodyURLEncoded formBody baseReq
   getResponseBody <$> httpJSON req
 
-requestAuthCredentials :: Config -> AuthCode -> IO RefreshToken
+requestAuthCredentials :: GDriveConfig -> AuthCode -> IO RefreshToken
 requestAuthCredentials config code = do
   baseReq <- parseRequest "POST https://www.googleapis.com/oauth2/v4/token"
   let formBody = authCredentialsFormBody config code
       req      = setRequestBodyURLEncoded formBody baseReq
   getResponseBody <$> httpJSON req
 
-authorizeInternalPoll :: Config -> Request -> Request
+authorizeInternalPoll :: GDriveConfig -> Request -> Request
 authorizeInternalPoll config = addRequestHeader "polling_secret_key" $ pollingSecretKey config
 
 
@@ -195,7 +197,7 @@ filesQuery :: ByteString
 filesQuery = renderQuery True
   [ ("q", Just "\'1EMLrmlFkArl4txYQnMR62_gae4yjShux\' in parents and trashed = false") ]
 
-accessTokenFormBody :: Config -> RefreshToken -> [(ByteString, ByteString)]
+accessTokenFormBody :: GDriveConfig -> RefreshToken -> [(ByteString, ByteString)]
 accessTokenFormBody config rft =
   [ ("client_id",     clientId config)
   , ("client_secret", clientSecret config)
@@ -203,7 +205,7 @@ accessTokenFormBody config rft =
   , ("grant_type",    "refresh_token")
   ]
 
-authCredentialsFormBody :: Config -> AuthCode -> [(ByteString, ByteString)]
+authCredentialsFormBody :: GDriveConfig -> AuthCode -> [(ByteString, ByteString)]
 authCredentialsFormBody config code =
   [ ("code",          encodeToken code)
   , ("client_id",     clientId config)
@@ -212,7 +214,7 @@ authCredentialsFormBody config code =
   , ("grant_type",    "authorization_code")
   ]
 
-signInUrl :: Config -> ByteString
+signInUrl :: GDriveConfig -> ByteString
 signInUrl config = baseUrl <> renderQuery True
   [ ("client_id",     Just $ clientId config)
   , ("redirect_uri",  Just $ redirectUri config)

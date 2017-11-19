@@ -8,18 +8,19 @@ import Data.DateTime         (DateTime)
 import Data.Text             (Text)
 import Data.Text.Encoding    (decodeUtf8, encodeUtf8)
 
-data Config =
-  Config {
+data GDriveConfig =
+  GDriveConfig {
     clientId         :: ByteString
   , clientSecret     :: ByteString
   , redirectUri      :: ByteString
   , pollingSecretKey :: ByteString
   , webhookUrl       :: ByteString
+  , slackToken       :: ByteString
   }
 
-newtype AuthCode     = AuthCode Text
-newtype AccessToken  = AccessToken Text
-newtype RefreshToken = RefreshToken Text
+newtype AuthCode     = AuthCode Text deriving Show
+newtype AccessToken  = AccessToken Text deriving Show
+newtype RefreshToken = RefreshToken Text deriving (Eq, Show)
 
 data File =
   File {
