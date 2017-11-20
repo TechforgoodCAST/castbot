@@ -27,13 +27,13 @@ appInit = makeSnaplet "castmin-bot" "castmin slack bot" Nothing $ do
   return $ App g
 
 infoHandler :: Handler App App ()
-infoHandler = writeBS "Visit /google-drive/sign-in to authenticate google drive"
+infoHandler = writeBS "Visit /google-drive/sign-in to authenticate with google drive"
 
-app' :: IO ()
-app' = do
+server :: IO ()
+server = do
   p <- loadSnapServerPort
   let config = setPort p defaultConfig
   serveSnaplet config appInit
 
 app :: IO ()
-app = app' `withAsync` const pollForNewFiles
+app = server `withAsync` const pollForNewFiles
