@@ -23,6 +23,7 @@ import           Network.HTTP.Types        (hAuthorization, renderQuery)
 import           Snap.Core                 hiding (Request, Response)
 import           Snap.Snaplet
 import           Snap.Snaplet.RedisDB      (RedisDB, redisDBInit, runRedisDB)
+import           System.Random             (randomRIO)
 import           Util                      (safeHead)
 
 data GoogleDrive =
@@ -88,17 +89,33 @@ checkNewFilesHandler = do
     filesPresent (Files xs) = not $ null xs
     foldLastChecked now     = either (const now) (fromMaybe now)
     foldPolling             = either (const False) (fromMaybe False)
+    foldGifs                = either (const []) id
 
     handle config rfr = do
       now         <- liftIO getCurrentTime
       lastChecked <- foldLastChecked now <$> runRedisDB db (getLastChecked now)
       newFiles    <- liftIO $ checkNewFiles config rfr lastChecked
       if filesPresent newFiles then do
-        liftIO $ requestPostToSlack config newFiles
+        gifs      <- foldGifs <$> runRedisDB db getGifs
+        randomGif <- liftIO $ getRandomGif gifs
+        liftIO . requestPostToSlack config $ SlackPost newFiles randomGif
         runRedisDB db $ setLastChecked now
         writeBS "Slack has been notified of new files added"
       else
         writeBS "No new files"
+
+
+getRandomGif :: [Gif] -> IO Gif
+getRandomGif gifs = do
+  let fallbackGif = Gif "https://media.giphy.com/media/cSVkEGjGsWz8k/giphy.gif"
+  fromMaybe fallbackGif <$> randomItem gifs
+
+randomItem :: [a] -> IO (Maybe a)
+randomItem [] = return Nothing
+randomItem xs = do
+  i <- randomRIO (0, length xs - 1)
+  return . Just $ xs !! i
+
 
 notifications :: Handler b GoogleDrive ()
 notifications = do
@@ -160,10 +177,10 @@ newFiles lastChecked (Files xs) = Files $ filter (\x -> createdDate x >= lastChe
 
 -- HTTP Client Requests
 
-requestPostToSlack :: GDriveConfig -> Files -> IO (Response BL.ByteString)
-requestPostToSlack config files = do
+requestPostToSlack :: GDriveConfig -> SlackPost -> IO (Response BL.ByteString)
+requestPostToSlack config slackPost = do
   req  <- parseRequest $ "POST " <> unpack (webhookUrl config)
-  let req' = setRequestBodyJSON files req
+  let req' = setRequestBodyJSON slackPost req
   httpLBS req'
 
 requestFilesInFolder :: GDriveConfig -> RefreshToken -> IO Files
@@ -195,7 +212,9 @@ authorizeInternalPoll config = addRequestHeader "polling_secret_key" $ pollingSe
 
 filesQuery :: ByteString
 filesQuery = renderQuery True
-  [ ("q", Just "\'1EMLrmlFkArl4txYQnMR62_gae4yjShux\' in parents and trashed = false") ]
+  [ ("q", Just $ proposalsFolderId <> " in parents and trashed = false") ]
+  where
+    proposalsFolderId = "\'0B_7-KMmA40dCcW9zZng1V2lxY0k\'"
 
 accessTokenFormBody :: GDriveConfig -> RefreshToken -> [(ByteString, ByteString)]
 accessTokenFormBody config rft =

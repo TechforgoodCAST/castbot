@@ -12,7 +12,6 @@ import Data.Text.Encoding
 import Database.Redis
 import GoogleDrive.Types
 import Snap.Snaplet.RedisDB
-import System.Environment               (getEnv)
 
 -- key value getters and setters
 
@@ -23,8 +22,8 @@ setPolling :: Bool -> Redis (Either Reply Status)
 setPolling = set "polling" . pack . show
 
 getLastChecked :: DateTime -> Redis (Either Reply (Maybe DateTime))
-getLastChecked now = parseTime now `deepMap` get "last_checked"
-  where parseTime fallback = fromMaybe fallback . fromSqlString . unpack
+getLastChecked fallback = parseTime fallback `deepMap` get "last_checked"
+  where parseTime t = fromMaybe t . fromSqlString . unpack
 
 setLastChecked :: DateTime -> Redis (Either Reply Status)
 setLastChecked = set "last_checked" . pack . toSqlString
@@ -34,6 +33,14 @@ getRefreshToken = decodeToken `deepMap` get "refresh_token"
 
 setRefreshToken :: RefreshToken -> Redis (Either Reply Status)
 setRefreshToken = set "refresh_token" . encodeToken
+
+getGifs :: Redis (Either Reply [Gif])
+getGifs = decodeGif `deepMap` smembers "gifs"
+  where decodeGif = Gif . decodeUtf8
+
+addGifs :: [Gif] -> Redis (Either Reply Integer)
+addGifs = sadd "gifs" . map enc
+  where enc (Gif url) = encodeUtf8 url
 
 deepMap :: (Functor f, Functor f1, Functor f2) => (a -> b) -> f2 (f1 (f a)) -> f2 (f1 (f b))
 deepMap = fmap . fmap . fmap

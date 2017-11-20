@@ -3,15 +3,15 @@
 
 module Application where
 
-import Client              (pollForNewFiles)
-import Control.Concurrent  (forkIO)
-import Control.Lens        (makeLenses)
-import Environment         (loadSnapServerPort)
+import Client                   (pollForNewFiles)
+import Control.Concurrent.Async
+import Control.Lens             (makeLenses)
+import Environment              (loadSnapServerPort)
 import GoogleDrive
 import Snap.Core
 import Snap.Http.Server
 import Snap.Snaplet
-import Snap.Util.FileServe (serveDirectory)
+import Snap.Util.FileServe      (serveDirectory)
 
 newtype App = App
   { _googleDrive :: Snaplet GoogleDrive }
@@ -27,11 +27,13 @@ appInit = makeSnaplet "castmin-bot" "castmin slack bot" Nothing $ do
   return $ App g
 
 infoHandler :: Handler App App ()
-infoHandler = writeText "Visit /google-drive/sign-in to link google drive with slack"
+infoHandler = writeBS "Visit /google-drive/sign-in to authenticate google drive"
 
-app :: IO ()
-app = do
+app' :: IO ()
+app' = do
   p <- loadSnapServerPort
   let config = setPort p defaultConfig
-  forkIO pollForNewFiles
   serveSnaplet config appInit
+
+app :: IO ()
+app = app' `withAsync` const pollForNewFiles
