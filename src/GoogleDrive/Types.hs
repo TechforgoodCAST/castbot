@@ -30,6 +30,13 @@ data File =
   }
 
 newtype Files = Files [File]
+newtype Gif   = Gif Text
+
+data SlackPost =
+  SlackPost {
+    files     :: Files
+  , randomGif :: Gif
+  }
 
 
 -- Token Class (convenience for converting between ByteStrings)
@@ -68,10 +75,10 @@ instance FromJSON File where
          <*> v .: "alternateLink"
          <*> v .: "createdDate"
 
-instance ToJSON Files where
-  toJSON (Files xs) =
+instance ToJSON SlackPost where
+  toJSON (SlackPost (Files xs) gif) =
     object [ "text" .= ("Some new files have been added to the proposals folder!" :: Text)
-           , "attachments" .= (map toJSON xs ++ [ catGif ])
+           , "attachments" .= (map toJSON xs ++ [ toJSON gif ])
            ]
 
 instance ToJSON File where
@@ -83,8 +90,8 @@ instance ToJSON File where
            , "color" .= ("#03e07b" :: Text)
            ]
 
-catGif :: Value
-catGif =
-  object [ "fallback"  .= ("cat gif" :: Text)
-         , "image_url" .= ("https://media.giphy.com/media/PUBxelwT57jsQ/giphy.gif" :: Text)
-         ]
+instance ToJSON Gif where
+  toJSON (Gif gifUrl) =
+    object [ "fallback"  .= ("random gif" :: Text)
+           , "image_url" .= gifUrl
+           ]
