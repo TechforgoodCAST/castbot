@@ -14,4 +14,4 @@ pollForNewFiles = forever $ do
   let r = "GET " <> origin <> "/google-drive/check-files"
   conf <- loadGDriveConfig
   req  <- authorizeInternalPoll conf <$> parseRequest r
-  httpLBS req >>= print
+  httpLBS req >>= hPrint stderr

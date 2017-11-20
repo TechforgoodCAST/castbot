@@ -1,6 +1,6 @@
-name:                castmin-bot
+name:                castbot
 version:             0.1.0.0
-homepage:            https://github.com/TechforgoodCAST/castmin-bot#README
+homepage:            https://github.com/TechforgoodCAST/castbot#README
 license:             MIT
 license-file:        LICENSE
 author:              Andrew MacMurray
@@ -41,15 +41,15 @@ library
                      , text
                      , transformers
 
-executable castmin-bot
+executable castbot
   hs-source-dirs:      app
   main-is:             Main.hs
   ghc-options:         -threaded -rtsopts -with-rtsopts=-N
   default-language:    Haskell2010
   build-depends:       base
-                     , castmin-bot
+                     , castbot
 
-test-suite castmin-bot-test
+test-suite castbot-test
   type:                exitcode-stdio-1.0
   hs-source-dirs:      test
   main-is:             Spec.hs
@@ -57,7 +57,7 @@ test-suite castmin-bot-test
   default-language:    Haskell2010
   build-depends:       base
                      , bytestring
-                     , castmin-bot
+                     , castbot
                      , datetime
                      , hedis
                      , hspec
@@ -67,4 +67,4 @@ test-suite castmin-bot-test
 
 source-repository head
   type:     git
-  location: https://github.com/TechforgoodCAST/castmin-bot
+  location: https://github.com/TechforgoodCAST/castbot

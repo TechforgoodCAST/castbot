@@ -1,1 +1,1 @@
-web: castmin-bot
+web: castbot

@@ -1,4 +1,4 @@
-# Castmin Bot
+# Castbot
 
 Slack integration to help with general CAST admin
 
@@ -16,7 +16,7 @@ Castmin Bot is a Haskell Snap server that communicates between the Google Drive 
 
 + Castmin bot polls a google drive folder for new files
 + If it finds files created since it last checked it will notify slack with a message (and links to the files)
-+ Notifications can be turned on and off from Slack via a [slash-command](https://api.slack.com/slash-commands) `/castmin-bot on` or `/castmin-bot off`
++ Notifications can be turned on and off from Slack via a [slash-command](https://api.slack.com/slash-commands) `/castbot on` or `/castbot off`
 
 ## Get up and running
 
