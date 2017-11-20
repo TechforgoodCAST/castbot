@@ -5,14 +5,15 @@ module Environment
   , loadOrigin
   ) where
 
-import Control.Monad.IO.Class
-import Control.Monad.Trans.Maybe
-import Data.ByteString.Char8
-import Database
-import Database.Redis
-import GoogleDrive.Types
-import System.Environment
-import System.Exit
+import           Control.Monad.IO.Class
+import           Control.Monad.Trans.Maybe
+import           Data.ByteString.Char8
+import           Database
+import           Database.Redis
+import           GoogleDrive.Types
+import           System.Environment
+import           System.Exit
+import qualified System.IO                 as IO
 
 -- Server Config
 
@@ -63,5 +64,5 @@ loadOrigin = lookupEnv "ORIGIN" >>= maybe fail return
 
 -- Utils
 
-printFail :: Show a => a -> IO b
-printFail msg = print msg >> exitFailure
+printFail :: String -> IO b
+printFail msg = IO.hPutStrLn IO.stderr msg >> exitFailure
