@@ -2,6 +2,7 @@ module Environment
   ( loadSnapServerPort
   , loadGDriveConfig
   , loadRedisConnectInfo
+  , loadOrigin
   ) where
 
 import Control.Monad.IO.Class
@@ -51,6 +52,13 @@ getGDriveConfig = liftIO . runMaybeT $
 
 loadRedisConnectInfo :: IO ConnectInfo
 loadRedisConnectInfo = parseConnection <$> getEnv "REDIS_URL" >>= either printFail return
+
+
+-- Origin e.g. http://localhost:8000 or https://castmin-bot.herokuapp.com
+
+loadOrigin :: IO String
+loadOrigin = lookupEnv "ORIGIN" >>= maybe fail return
+  where fail = printFail "please set the ORIGIN env var"
 
 
 -- Utils
