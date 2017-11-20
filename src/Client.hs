@@ -6,6 +6,7 @@ import Data.Monoid         ((<>))
 import Environment         (loadGDriveConfig, loadOrigin)
 import GoogleDrive         (authorizeInternalPoll)
 import Network.HTTP.Simple
+import System.IO
 
 pollForNewFiles :: IO ()
 pollForNewFiles = forever $ do
