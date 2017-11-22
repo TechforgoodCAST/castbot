@@ -7,6 +7,7 @@ import Data.Monoid         ((<>))
 import Environment         (loadGDriveConfig, loadOrigin)
 import GoogleDrive         (authorizeInternalPoll)
 import Network.HTTP.Simple (httpLBS, parseRequest)
+import System.IO
 
 pollForNewFiles :: IO ()
 pollForNewFiles = do
@@ -17,7 +18,7 @@ pollForNewFiles = do
     let r = "GET " <> origin <> "/google-drive/check-files"
     conf <- loadGDriveConfig
     req  <- authorizeInternalPoll conf <$> parseRequest r
-    httpLBS req >>= print
+    httpLBS req >>= hPrint stderr
     pollForNewFiles
 
 isDuringTimeWindow :: IO Bool
