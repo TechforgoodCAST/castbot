@@ -20,7 +20,6 @@ pollForNewFiles = do
     httpLBS req >>= print
     pollForNewFiles
 
-
 isDuringTimeWindow :: IO Bool
 isDuringTimeWindow = do
   (_, _, _, hr, _, _) <- toGregorian <$> getCurrentTime

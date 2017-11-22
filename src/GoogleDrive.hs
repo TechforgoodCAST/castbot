@@ -101,8 +101,7 @@ checkNewFilesHandler = do
         liftIO . requestPostToSlack config $ SlackPost newFiles randomGif
         runRedisDB db $ setLastChecked now
         writeBS "Slack has been notified of new files added"
-      else do
-        runRedisDB db $ setLastChecked now
+      else
         writeBS "No new files"
 
 
