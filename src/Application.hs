@@ -36,4 +36,4 @@ server = do
   serveSnaplet config appInit
 
 app :: IO ()
-app = server `withAsync` const pollForNewFiles
+app = pollForNewFiles `withAsync` const server
