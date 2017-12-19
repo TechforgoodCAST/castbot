@@ -5,6 +5,7 @@
 module GoogleDrive.Snaplet where
 
 import           Control.Lens              (makeLenses, view)
+import           Control.Monad             ((>=>))
 import           Control.Monad.IO.Class    (MonadIO, liftIO)
 import           Control.Monad.Trans.Maybe (MaybeT (..), runMaybeT)
 import           Data.ByteString.Char8     (ByteString, pack, unpack)
@@ -75,39 +76,50 @@ signInHandler = view conf >>= (redirect . signInUrl)
 
 checkNewFilesHandler :: Handler b GoogleDrive ()
 checkNewFilesHandler = do
-  config       <- view conf
   refreshToken <- runRedisDB db getRefreshToken
-  shouldPoll   <- foldPolling <$> runRedisDB db getPolling
+  shouldPoll   <- foldPollResponse <$> runRedisDB db getPolling
 
   -- runs request to google drive api and posts to slack if polling is switched on
-  if   shouldPoll
-  then either redisErr (maybeCheckFiles config) refreshToken
-  else writeBS "polling switched off"
-
+  if shouldPoll then
+    either redisErr checkFiles refreshToken
+  else
+    writeBS "polling switched off"
   where
-    maybeCheckFiles config  = maybe noToken $ handle config
-    redisErr                = writeBS . pack . show
-    noToken                 = writeBS "Cannot find refresh token, please reauthenticate"
+    checkFiles  = maybe noToken handleFiles
+    redisErr    = writeBS . pack . show
+    noToken     = writeBS "Cannot find refresh token, please reauthenticate"
+    handleFiles = requestNewFilesHandler >=> postFilesToSlackHandler
+
+
+requestNewFilesHandler :: RefreshToken -> Handler b GoogleDrive Files
+requestNewFilesHandler rfr = do
+  config      <- view conf
+  now         <- liftIO getCurrentTime
+  lastChecked <- foldCheckedResponse now <$> runRedisDB db (getLastChecked now)
+  liftIO $ checkNewFiles config rfr lastChecked
+
+
+postFilesToSlackHandler :: Files -> Handler b GoogleDrive ()
+postFilesToSlackHandler newFiles =
+  if filesPresent newFiles then do
+    config    <- view conf
+    now       <- liftIO getCurrentTime
+    randomGif <- runRedisDB db getGifs >>= liftIO <$> getRandomGif
+    liftIO . requestPostToSlack config $ SlackPost newFiles randomGif
+    runRedisDB db $ setLastChecked now
+    writeBS "Slack has been notified of new files added"
+  else
+    writeBS "No new files"
+  where
     filesPresent (Files xs) = not $ null xs
-    foldLastChecked now     = either (const now) (fromMaybe now)
-    foldPolling             = either (const False) (fromMaybe False)
-    foldGifs                = either (const []) id
 
-    handle config rfr = do
-      now         <- liftIO getCurrentTime
-      lastChecked <- foldLastChecked now <$> runRedisDB db (getLastChecked now)
-      newFiles    <- liftIO $ checkNewFiles config rfr lastChecked
-      if filesPresent newFiles then do
-        gifs      <- foldGifs <$> runRedisDB db getGifs
-        randomGif <- liftIO $ getRandomGif gifs
-        liftIO . requestPostToSlack config $ SlackPost newFiles randomGif
-        runRedisDB db $ setLastChecked now
-        writeBS "Slack has been notified of new files added"
-      else
-        writeBS "No new files"
 
-getRandomGif :: [Gif] -> IO Gif
-getRandomGif gifs = do
+getRandomGif :: Either Reply [Gif] -> IO Gif
+getRandomGif = randomGif' . foldGifs
+  where foldGifs = either (const []) id
+
+randomGif' :: [Gif] -> IO Gif
+randomGif' gifs = do
   let fallbackGif = Gif "https://media.giphy.com/media/cSVkEGjGsWz8k/giphy.gif"
   fromMaybe fallbackGif <$> randomItem gifs
 
@@ -161,11 +173,11 @@ slackPayload p = M.lookup "text" p >>= safeHead
 -- Handler for routes only available to the internal HTTP Client
 
 internalRoute :: Handler b GoogleDrive () -> Handler b GoogleDrive ()
-internalRoute handler = do
+internalRoute continue = do
   secret  <- pollingSecretKey <$> view conf
   secret' <- headerSecret <$> getRequest
-  if   secret == secret'
-  then handler
+  if secret == secret' then
+    continue
   else do
     modifyResponse $ setResponseStatus 401 "unauthorized"
     writeBS "unauthorized"

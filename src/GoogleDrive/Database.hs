@@ -19,12 +19,20 @@ import Util                             (deepMap)
 getPolling :: Redis (Either Reply (Maybe Bool))
 getPolling = (read . unpack) `deepMap` get "polling"
 
+foldPollResponse :: Either Reply (Maybe Bool) -> Bool
+foldPollResponse = either (const False) (fromMaybe False)
+
+
 setPolling :: Bool -> Redis (Either Reply Status)
 setPolling = set "polling" . pack . show
 
 getLastChecked :: DateTime -> Redis (Either Reply (Maybe DateTime))
 getLastChecked fallback = parseTime fallback `deepMap` get "last_checked"
   where parseTime t = fromMaybe t . fromSqlString . unpack
+
+foldCheckedResponse :: DateTime -> Either Reply (Maybe DateTime) -> DateTime
+foldCheckedResponse now = either (const now) (fromMaybe now)
+
 
 setLastChecked :: DateTime -> Redis (Either Reply Status)
 setLastChecked = set "last_checked" . pack . toSqlString
