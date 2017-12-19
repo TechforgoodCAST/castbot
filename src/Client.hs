@@ -5,9 +5,11 @@ import Control.Monad       (when)
 import Data.DateTime       (getCurrentTime, toGregorian)
 import Data.Monoid         ((<>))
 import Environment         (loadGDriveConfig, loadOrigin)
-import GoogleDrive         (authorizeInternalPoll)
+import GoogleDrive.Request (authorizeInternalPoll)
 import Network.HTTP.Simple (httpLBS, parseRequest)
 import System.IO
+
+-- Internal HTTP Client that checks for new files periodically
 
 pollForNewFiles :: IO ()
 pollForNewFiles = do

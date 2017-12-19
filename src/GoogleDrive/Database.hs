@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module Database where
+module GoogleDrive.Database where
 
 import Control.Monad.IO.Class
 import Data.Attoparsec.ByteString.Char8
@@ -12,6 +12,7 @@ import Data.Text.Encoding
 import Database.Redis
 import GoogleDrive.Types
 import Snap.Snaplet.RedisDB
+import Util                             (deepMap)
 
 -- key value getters and setters
 
@@ -42,14 +43,11 @@ addGifs :: [Gif] -> Redis (Either Reply Integer)
 addGifs = sadd "gifs" . map enc
   where enc (Gif url) = encodeUtf8 url
 
-deepMap :: (Functor f, Functor f1, Functor f2) => (a -> b) -> f2 (f1 (f a)) -> f2 (f1 (f b))
-deepMap = fmap . fmap . fmap
 
+-- Redis Connection Parser
 
--- Parse Connection
-
-parseConnection :: String -> Either String ConnectInfo
-parseConnection = parseOnly connectionParser . pack
+parseRedisConnection :: String -> Either String ConnectInfo
+parseRedisConnection = parseOnly connectionParser . pack
 
 connectionParser :: Parser ConnectInfo
 connectionParser = do

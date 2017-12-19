@@ -14,11 +14,12 @@ cabal-version:       >=1.10
 library
   hs-source-dirs:      src
   exposed-modules:     Application
-                     , Database
-                     , GoogleDrive
-                     , GoogleDrive.Types
                      , Client
                      , Environment
+                     , GoogleDrive.Database
+                     , GoogleDrive.Snaplet
+                     , GoogleDrive.Types
+                     , GoogleDrive.Request
                      , Util
   default-language:    Haskell2010
   build-depends:       base >= 4.7 && < 5

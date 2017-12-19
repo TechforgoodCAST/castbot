@@ -6,9 +6,9 @@ import           Data.ByteString.Char8
 import           Data.DateTime
 import qualified Data.Map               as M
 import           Data.Maybe
-import           Database
 import           Database.Redis         hiding (get)
 import           Environment            (loadRedisConnectInfo)
+import           GoogleDrive.Database
 import           GoogleDrive.Types
 import           Snap.Core
 import           Snap.Snaplet
@@ -39,7 +39,7 @@ main = hspec $ do
     it "serves index route correctly" $ do
       resp <- getSnap >>= runHandler (get "/" M.empty)
       assertSuccess resp
-      assertBodyContains "Visit /google-drive/sign-in to link google drive with slack" resp
+      assertBodyContains "Visit /google-drive/sign-in to authenticate with google drive" resp
 
     it "serves static assets correctly" $ do
       resp <- getSnap >>= runHandler (get "/google96f859d812b7c0c5.html" M.empty)
