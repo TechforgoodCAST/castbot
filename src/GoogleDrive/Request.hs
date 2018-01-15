@@ -12,8 +12,9 @@ import           Network.HTTP.Types    (hAuthorization, renderQuery)
 
 -- Check for Files Requests
 
-checkNewFiles :: GDriveConfig -> RefreshToken -> DateTime -> IO Files
-checkNewFiles config token lastChecked = newFiles lastChecked <$> requestFilesInFolder config token
+checkNewFiles :: GDriveConfig -> ByteString -> RefreshToken -> DateTime -> IO Files
+checkNewFiles config folderId token lastChecked =
+  newFiles lastChecked <$> requestFilesInFolder config folderId token
 
 newFiles :: DateTime -> Files -> Files
 newFiles lastChecked (Files xs) = Files $ filter (\x -> createdDate x >= lastChecked) xs
@@ -27,10 +28,11 @@ requestPostToSlack config slackPost = do
   let req' = setRequestBodyJSON slackPost req
   httpLBS req'
 
-requestFilesInFolder :: GDriveConfig -> RefreshToken -> IO Files
-requestFilesInFolder config refreshToken = do
+requestFilesInFolder :: GDriveConfig -> ByteString -> RefreshToken -> IO Files
+requestFilesInFolder config folderId refreshToken = do
+  let rawReq   = "GET https://www.googleapis.com/drive/v2/files" <> unpack (filesQuery folderId)
   tkn     <- encodeToken <$> requestAccessToken config refreshToken
-  baseReq <- parseRequest $ "GET https://www.googleapis.com/drive/v2/files" <> unpack filesQuery
+  baseReq <- parseRequest rawReq
   let req = addRequestHeader hAuthorization ("Bearer " <> tkn) baseReq
   getResponseBody <$> httpJSON req
 
@@ -54,11 +56,11 @@ authorizeInternalPoll config = addRequestHeader "polling_secret_key" $ pollingSe
 
 -- URI Helpers
 
-filesQuery :: ByteString
-filesQuery = renderQuery True
-  [ ("q", Just $ proposalsFolderId <> " in parents and trashed = false") ]
-  where
-    proposalsFolderId = "\'0B_7-KMmA40dCcW9zZng1V2lxY0k\'"
+filesQuery :: ByteString -> ByteString
+filesQuery folderId = renderQuery True
+  [ ("q", Just $ folderId <> " in parents and trashed = false") ]
+  -- where
+  --   proposalsFolderId = "\'0B_7-KMmA40dCcW9zZng1V2lxY0k\'"
 
 accessTokenFormBody :: GDriveConfig -> RefreshToken -> [(ByteString, ByteString)]
 accessTokenFormBody config rft =

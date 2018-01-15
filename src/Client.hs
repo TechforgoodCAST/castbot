@@ -13,17 +13,26 @@ import System.IO
 
 pollForNewFiles :: IO ()
 pollForNewFiles = do
-  shouldPoll <- isDuringTimeWindow
+  shouldPoll <- withinOfficeHours
   when shouldPoll $ do
-    threadDelay $ 10 * 1000000
-    origin <- loadOrigin
-    let r = "GET " <> origin <> "/google-drive/check-files"
-    conf <- loadGDriveConfig
-    req  <- authorizeInternalPoll conf <$> parseRequest r
-    httpLBS req >>= hPrint stderr
+    waitFor 10
+    triggerCheck
     pollForNewFiles
 
-isDuringTimeWindow :: IO Bool
-isDuringTimeWindow = do
+triggerCheck :: IO ()
+triggerCheck = do
+  origin <- loadOrigin
+  conf   <- loadGDriveConfig
+  let rawRequest = "GET " <> origin <> "/google-drive/check-files"
+  req    <- authorizeInternalPoll conf <$> parseRequest rawRequest
+  httpLBS req >>= hPrint stderr
+
+withinOfficeHours :: IO Bool
+withinOfficeHours = do
+  let morning = 8
+      evening = 18
   (_, _, _, hr, _, _) <- toGregorian <$> getCurrentTime
-  return $ hr >= 8 && hr <= 18
+  return $ hr >= morning && hr <= evening
+
+waitFor :: Int -> IO ()
+waitFor n = threadDelay $ n * 1000000

@@ -13,7 +13,7 @@ import           Data.DateTime             (getCurrentTime)
 import qualified Data.Map                  as M
 import           Data.Maybe                (fromMaybe)
 import           Data.Text.Encoding        (decodeUtf8)
-import           Database.Redis
+import           Database.Redis            (Redis, Reply)
 import           Environment
 import           GoogleDrive.Database
 import           GoogleDrive.Request
@@ -63,7 +63,7 @@ authRedirectHandler = do
   config <- view conf
   code   <- decode <$> getParam "code"
   res    <- liftIO . requestAuthCredentials config $ AuthCode code
-  runRedisDB db $ setRefreshToken res
+  runRedis $ setRefreshToken res
   redirect "/google-drive/auth-success"
   where
     decode = decodeUtf8 . fromMaybe ""
@@ -76,8 +76,8 @@ signInHandler = view conf >>= (redirect . signInUrl)
 
 checkNewFilesHandler :: Handler b GoogleDrive ()
 checkNewFilesHandler = do
-  refreshToken <- runRedisDB db getRefreshToken
-  shouldPoll   <- foldPollResponse <$> runRedisDB db getPolling
+  refreshToken <- runRedis getRefreshToken
+  shouldPoll   <- fromResponse False <$> runRedis getPolling
 
   -- runs request to google drive api and posts to slack if polling is switched on
   if shouldPoll then
@@ -95,18 +95,18 @@ requestNewFilesHandler :: RefreshToken -> Handler b GoogleDrive Files
 requestNewFilesHandler rfr = do
   config      <- view conf
   now         <- liftIO getCurrentTime
-  lastChecked <- foldCheckedResponse now <$> runRedisDB db (getLastChecked now)
-  liftIO $ checkNewFiles config rfr lastChecked
-
+  lastChecked <- fromResponse now <$> runRedis (getLastChecked now)
+  folderId    <- fromResponse ""  <$> runRedis getProposalsFolderId
+  liftIO $ checkNewFiles config folderId rfr lastChecked
 
 postFilesToSlackHandler :: Files -> Handler b GoogleDrive ()
 postFilesToSlackHandler newFiles =
   if filesPresent newFiles then do
     config    <- view conf
     now       <- liftIO getCurrentTime
-    randomGif <- runRedisDB db getGifs >>= liftIO <$> getRandomGif
+    randomGif <- runRedis getGifs >>= liftIO <$> getRandomGif
     liftIO . requestPostToSlack config $ SlackPost newFiles randomGif
-    runRedisDB db $ setLastChecked now
+    runRedis $ setLastChecked now
     writeBS "Slack has been notified of new files added"
   else
     writeBS "No new files"
@@ -151,12 +151,12 @@ handleSlackPayload payload =
 
 notificationsOnHandler :: Handler b GoogleDrive ()
 notificationsOnHandler = do
-  runRedisDB db $ setPolling True
+  runRedis $ setPolling True
   writeBS "notifications switched on"
 
 notificationsOffHandler :: Handler b GoogleDrive ()
 notificationsOffHandler = do
-  runRedisDB db $ setPolling False
+  runRedis $ setPolling False
   writeBS "notifications switched off"
 
 
@@ -183,3 +183,9 @@ internalRoute continue = do
     writeBS "unauthorized"
   where
     headerSecret = fromMaybe "" . getHeader "polling_secret_key" . rqHeaders
+
+
+-- Helper to run redis in handler context
+
+runRedis :: Redis a -> Handler b GoogleDrive a
+runRedis = runRedisDB db
