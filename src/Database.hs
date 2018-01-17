@@ -1,6 +1,6 @@
 {-# LANGUAGE OverloadedStrings #-}
 
-module GoogleDrive.Database where
+module Database where
 
 import Control.Monad.IO.Class
 import Data.Attoparsec.ByteString.Char8

@@ -16,8 +16,7 @@ library
   exposed-modules:     Application
                      , Client
                      , Environment
-                     , GoogleDrive.Database
-                     , GoogleDrive.Snaplet
+                     , Database
                      , GoogleDrive.Types
                      , GoogleDrive.Request
                      , Util

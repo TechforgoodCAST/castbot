@@ -8,8 +8,8 @@ module Environment
 import           Control.Monad.IO.Class
 import           Control.Monad.Trans.Maybe
 import           Data.ByteString.Char8
+import           Database                  (parseRedisConnection)
 import           Database.Redis
-import           GoogleDrive.Database      (parseRedisConnection)
 import           GoogleDrive.Types
 import           System.Environment
 import           System.Exit
